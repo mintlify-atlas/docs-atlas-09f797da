@@ -1,122 +1,192 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "PSFalcon",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#242b2c",
+    "light": "#040404",
+    "dark": "#242b2c"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/f29018a1-d2d4-46d2-8d13-4a2632a679a2.png",
+  "logo": {
+    "light": "https://media.brand.dev/3b16fb27-22e9-4daa-a368-88b404b0d37e.svg",
+    "dark": "https://media.brand.dev/3b16fb27-22e9-4daa-a368-88b404b0d37e.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/CrowdStrike/psfalcon"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/CrowdStrike/psfalcon"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core/authentication",
+              "core/error-handling",
+              "core/pagination",
+              "core/filtering"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "guides/working-with-hosts",
+              "guides/real-time-response",
+              "guides/managing-policies",
+              "guides/threat-intelligence",
+              "guides/cloud-security"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "api/overview"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Authentication",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/oauth2"
+            ]
+          },
+          {
+            "group": "Alerts & Detections",
+            "pages": [
+              "api/alerts",
+              "api/detects",
+              "api/incidents",
+              "api/overwatch"
+            ]
+          },
+          {
+            "group": "Host Management",
+            "pages": [
+              "api/devices",
+              "api/host-groups",
+              "api/sensor-tags"
+            ]
+          },
+          {
+            "group": "Real-time Response",
+            "pages": [
+              "api/real-time-response",
+              "api/rtr-admin",
+              "api/rtr-scripts"
+            ]
+          },
+          {
+            "group": "Threat Intelligence",
+            "pages": [
+              "api/intel",
+              "api/iocs",
+              "api/malquery",
+              "api/falconx"
+            ]
+          },
+          {
+            "group": "Policy Management",
+            "pages": [
+              "api/prevention-policies",
+              "api/response-policies",
+              "api/sensor-update-policies",
+              "api/firewall-policies",
+              "api/device-control-policies"
+            ]
+          },
+          {
+            "group": "Cloud Security",
+            "pages": [
+              "api/cloud-aws",
+              "api/cloud-azure",
+              "api/cloud-gcp",
+              "api/container-security",
+              "api/kubernetes-protection"
+            ]
+          },
+          {
+            "group": "Identity & Access",
+            "pages": [
+              "api/user-management",
+              "api/mssp",
+              "api/identity-protection"
+            ]
+          },
+          {
+            "group": "Security Operations",
+            "pages": [
+              "api/spotlight",
+              "api/filevantage",
+              "api/firewall-management",
+              "api/quarantine",
+              "api/workflows"
+            ]
+          },
+          {
+            "group": "Monitoring & Analysis",
+            "pages": [
+              "api/recon",
+              "api/threat-graph",
+              "api/discover",
+              "api/fdr",
+              "api/logscale"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/samples",
+              "api/reports",
+              "api/config"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Common Tasks",
+            "pages": [
+              "examples/authentication",
+              "examples/host-operations",
+              "examples/detection-management",
+              "examples/rtr-automation"
+            ]
+          },
+          {
+            "group": "Advanced Scenarios",
+            "pages": [
+              "examples/bulk-operations",
+              "examples/custom-ioc-workflows",
+              "examples/mssp-operations",
+              "examples/reporting-automation"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

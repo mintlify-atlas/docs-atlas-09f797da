@@ -1,0 +1,447 @@
+---
+title: RTR Automation
+description: Automate Real-time Response operations across single and multiple hosts
+icon: terminal
+---
+
+Automate Real-time Response (RTR) operations including command execution, file retrieval, script uploads, and batch operations.
+
+## Basic RTR Commands
+
+Execute commands on individual hosts.
+
+```powershell
+# Execute a read-only command on a host
+$HostId = 'abc123...'
+Invoke-FalconRtr -Command 'ls' -Argument 'C:\Users' -HostId $HostId
+
+# Execute command with timeout
+Invoke-FalconRtr -Command 'ps' -HostId $HostId -Timeout 30
+
+# Queue command for offline host
+Invoke-FalconRtr -Command 'ls' -HostId $HostId -QueueOffline $true
+```
+
+## Execute Admin Commands
+
+Run privileged RTR commands.
+
+```powershell
+# Get a file hash
+Invoke-FalconAdminRtr -Command 'filehash' -Argument 'C:\suspicious.exe' -HostId $HostId
+
+# Run a script
+Invoke-FalconAdminRtr -Command 'runscript' -Argument '-Raw=```Get-Process | Export-Csv C:\processes.csv```' -HostId $HostId
+
+# Execute command and get result
+Invoke-FalconAdminRtr -Command 'reg' -Argument 'query HKLM\Software\Microsoft\Windows\CurrentVersion' -HostId $HostId
+```
+
+## RTR on Host Groups
+
+Execute commands across all members of a host group.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$GroupName,
+  
+  [Parameter(Mandatory)]
+  [string]$Command,
+  
+  [string]$Argument,
+  
+  [boolean]$QueueOffline
+)
+
+# Find group identifier using name filter
+$GroupId = Get-FalconHostGroup -Filter "name:'$($GroupName.ToLower())'"
+if (!$GroupId) { 
+  throw "No host group found matching '$($GroupName.ToLower())'." 
+}
+
+# Set CSV output file name and parameters
+$OutputFile = Join-Path (Get-Location).Path "$('rtr',($Command -replace ' ','_'),$GroupId -join '_').csv"
+$Param = @{ GroupId = $GroupId }
+
+# Add Command/Argument/QueueOffline if provided
+switch ($PSBoundParameters.Keys) {
+  { $_ -ne 'GroupName' } { $Param[$_] = $PSBoundParameters.$_ }
+}
+
+# Execute and output results to CSV
+Invoke-FalconRtr @Param | Export-Csv -Path $OutputFile -NoTypeInformation
+
+if (Test-Path $OutputFile) { 
+  Get-ChildItem $OutputFile | Select-Object FullName,Length,LastWriteTime 
+}
+```
+
+## Upload and Execute Scripts
+
+Upload PowerShell scripts and execute them on target hosts.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidateScript({ Test-Path $_ })]
+  [string]$Path,
+  
+  [Parameter(Mandatory)]
+  [ValidatePattern('^[a-fA-F0-9]{32}$')]
+  [string[]]$HostId
+)
+
+begin {
+  # Encode script to Base64
+  $EncodedScript = [Convert]::ToBase64String(
+    [System.Text.Encoding]::Unicode.GetBytes((Get-Content -Path $Path -Raw))
+  )
+}
+
+process {
+  $Param = @{
+    Command = 'runscript'
+    Argument = '-Raw=```powershell.exe -Enc ' + $EncodedScript + '```'
+    HostId = $HostId
+  }
+  
+  Invoke-FalconRtr @Param
+}
+```
+
+## File Retrieval
+
+Retrieve files from remote hosts.
+
+### Retrieve File from Single Host
+
+```powershell
+# Start session
+$Session = Start-FalconSession -Id $HostId
+
+# Request file
+$FilePath = 'C:\Users\admin\suspicious.exe'
+$GetRequest = Invoke-FalconRtrGet -FilePath $FilePath -SessionId $Session.session_id
+
+# Wait for file to be ready and confirm
+$Confirm = $null
+do {
+  Start-Sleep -Seconds 5
+  $Confirm = Confirm-FalconGetFile -CloudRequestId $GetRequest.cloud_request_id -SessionId $Session.session_id
+} while (!$Confirm.sha256)
+
+# Download the file
+$OutputPath = Join-Path (Get-Location).Path "suspicious.exe.7z"
+Receive-FalconGetFile -Sha256 $Confirm.sha256 -SessionId $Session.session_id -Path $OutputPath
+
+Write-Host "File downloaded to: $OutputPath"
+```
+
+### Retrieve File from Multiple Hosts
+
+```powershell
+#Requires -Version 5.1
+using module PSFalcon
+
+param(
+  [Parameter(Mandatory)]
+  [string[]]$HostIds,
+  
+  [Parameter(Mandatory)]
+  [string]$FilePath,
+  
+  [Parameter(Mandatory)]
+  [string]$OutputDirectory
+)
+
+begin {
+  # Start batch session
+  Write-Verbose "Starting Falcon session for hosts: $($HostIds -join ', ')"
+  $session = Start-FalconSession -Id $HostIds
+  $batchId = $session.batch_id
+  Write-Verbose "Session started with Batch ID: $batchId"
+}
+
+process {
+  try {
+    # Invoke batch get command
+    Write-Verbose "Requesting file '$FilePath' from hosts in batch $batchId"
+    $batchGet = Invoke-FalconBatchGet -FilePath $FilePath -BatchId $batchId
+    $batchGetCmdReqId = $batchGet.batch_get_cmd_req_id
+    Write-Verbose "Batch get command request ID: $batchGetCmdReqId"
+    
+    # Confirm file retrieval with retry
+    $retryCount = 5
+    $sha256 = $null
+    $sessionId = $null
+    
+    for ($i = 1; $i -le $retryCount; $i++) {
+      Write-Verbose "Attempt ${i}: Confirming file retrieval"
+      $fileConfirmation = Confirm-FalconGetFile -BatchGetCmdReqId $batchGetCmdReqId
+      
+      if ($fileConfirmation.sha256) {
+        $sha256 = $fileConfirmation.sha256
+        $sessionId = $fileConfirmation.session_id
+        Write-Verbose "File confirmation successful. SHA256: $sha256"
+        break
+      } else {
+        Write-Verbose "SHA256 not available yet. Retrying in 5 seconds..."
+        Start-Sleep -Seconds 5
+      }
+    }
+    
+    if (-not $sha256) {
+      Write-Error "SHA256 hash could not be retrieved after $retryCount attempts"
+      return
+    }
+    
+    # Resolve output directory
+    $OutputDirectory = $OutputDirectory.Trim() -replace '(^"|"$)', ''
+    $resolvedOutputDirectory = Resolve-Path -Path $OutputDirectory
+    
+    # Download file
+    $outputFilePath = Join-Path -Path $resolvedOutputDirectory -ChildPath "$($FilePath | Split-Path -Leaf).7z"
+    Receive-FalconGetFile -Path $outputFilePath -Sha256 $sha256 -SessionId $sessionId
+    
+    Write-Host "File successfully downloaded to $outputFilePath"
+  } catch {
+    Write-Error "An error occurred: $_"
+    throw $_
+  }
+}
+```
+
+## Batch Operations
+
+Execute commands across multiple hosts simultaneously.
+
+```powershell
+# Start batch session with multiple hosts
+$HostIds = @('abc123...', 'def456...', 'ghi789...')
+$Batch = Start-FalconSession -Id $HostIds -Timeout 60
+
+if ($Batch.batch_id) {
+  # Execute command on all hosts in batch
+  $Results = $Batch | Invoke-FalconAdminCommand -Command 'ls' -Argument 'C:\Temp'
+  
+  # Process results
+  foreach ($Result in $Results) {
+    Write-Host "Host: $($Result.aid)"
+    Write-Host "Output: $($Result.stdout)"
+    Write-Host "Errors: $($Result.stderr)"
+    Write-Host "---"
+  }
+}
+```
+
+## Advanced: CsWinDiag Automation
+
+Automate collection of Windows diagnostic data from multiple hosts.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('^[a-fA-F0-9]{32}$')]
+  [string[]]$HostId
+)
+
+begin {
+  # Script to check for newly created cswindiag archives
+  $CheckDiag = '$CsWinDiag = Get-ChildItem -Path (Join-Path $env:ProgramFiles "CrowdStrike\Rtr\PutRun"' +
+    ') -Filter "CSWinDiag*.zip" | Where-Object { $_.LastWriteTime.Ticks -gt {0} } | Select-Object -First 1 |' +
+    'Select-Object -ExpandProperty FullName; if ($CsWinDiag) { $CsWinDiag } else { throw "incomplete" }'
+}
+
+process {
+  try {
+    # Filter to Windows hosts only
+    $HostList = $HostId | Select-Object -Unique | Get-FalconHost | 
+      Where-Object { $_.platform_name -eq 'Windows' } | 
+      Select-Object -ExpandProperty device_id
+    
+    if ($HostId -and !$HostList) { 
+      throw "CsWinDiag is only available for Windows hosts." 
+    }
+    
+    # Create tracking variables
+    [System.Collections.Generic.List[string]]$WaitDiag = @()
+    @('DiagCreated','Failed','WaitGet').foreach{
+      New-Variable -Name $_ -Value ([System.Collections.Generic.List[PSCustomObject]]@())
+    }
+    
+    # Start batch session
+    Write-Host "Starting batch RTR session with $(($HostList | Measure-Object).Count) host(s)..."
+    $Batch = Start-FalconSession -Id $HostList -Timeout 60
+    
+    if (!$Batch.batch_id) { 
+      throw "Failed to create batch RTR session." 
+    }
+    
+    # Issue cswindiag command
+    $Start = (Get-Date).Ticks
+    $Cmd = $Batch | Invoke-FalconAdminCommand -Command cswindiag
+    
+    foreach ($CmdResult in $Cmd) {
+      if ($CmdResult.stdout -eq 'The process was successfully started') {
+        $WaitDiag.Add($CmdResult.aid)
+      } else {
+        $Failed.Add($CmdResult)
+      }
+    }
+    
+    if ($WaitDiag.Count -gt 0) {
+      Write-Host "Started 'cswindiag' on $($WaitDiag.Count) host(s). Waiting for results..."
+      $Argument = '-Raw=```' + ($CheckDiag -replace '\{0\}',$Start) + '```'
+      
+      do {
+        Start-Sleep -Seconds 30
+        $Param = @{
+          BatchId = $Batch.batch_id
+          Command = 'runscript'
+          Argument = $Argument
+          OptionalHostId = $WaitDiag
+        }
+        
+        $Cmd = Invoke-FalconAdminCommand @Param
+        
+        foreach ($ScriptResult in ($Cmd | Where-Object { $_.stdout })) {
+          Write-Host "Result created for host '$($ScriptResult.aid)'."
+          $DiagCreated.Add($ScriptResult)
+          [void]$WaitDiag.Remove($ScriptResult.aid)
+        }
+        
+        if ($WaitDiag.Count -gt 0) {
+          $Progress = ($DiagCreated.Count/($DiagCreated.Count + $WaitDiag.Count)).ToString("P")
+          Write-Host "Waiting for results... [$Progress complete]"
+        }
+      } until ($WaitDiag.Count -eq 0)
+      
+      # Download diagnostic files
+      foreach ($FileResult in $DiagCreated) {
+        Write-Host "Downloading diagnostic from host '$($FileResult.aid)'..."
+        $Param = @{
+          BatchId = $Batch.batch_id
+          FilePath = "'$($FileResult.stdout)'"
+          OptionalHostId = $FileResult.aid
+        }
+        (Invoke-FalconBatchGet @Param).hosts | ForEach-Object { $WaitGet.Add($_) }
+      }
+      
+      # Wait for uploads and download
+      do {
+        $ConfirmHost = $WaitGet | Where-Object { $null -ne $_.stdout -and $_.complete -eq $true }
+        
+        if ($null -ne $ConfirmHost) {
+          $Progress = (($ConfirmHost | Measure-Object).Count/$WaitGet.Count).ToString("P")
+          Write-Host "Waiting for uploads... [$Progress complete]"
+          Start-Sleep -Seconds 30
+          
+          foreach ($Item in $ConfirmHost) {
+            $Item | Confirm-FalconGetFile | ForEach-Object {
+              if ($_.sha256) {
+                $_ | Receive-FalconGetFile -Path "$($_.name | Split-Path -Leaf).7z"
+                ($WaitGet | Where-Object { $_.session_id -eq $Item.session_id }) | ForEach-Object {
+                  $_.stdout = $null
+                }
+              }
+            }
+          }
+        }
+      } until ($null -eq $ConfirmHost)
+    }
+    
+    # Output any failures
+    if ($Failed.Count -gt 0) { $Failed }
+    
+  } catch {
+    throw $_
+  }
+}
+```
+
+## RTR with Conditional Containment
+
+Execute RTR to check for indicators and contain if found.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Target,
+  
+  [Parameter(Mandatory)]
+  [string]$Filepath
+)
+
+try {
+  # Find host
+  $HostId = Get-FalconHost -Filter "hostname:['$Target']" -Sort last_seen.desc -Limit 1
+  if (!$HostId) { 
+    throw "Unable to find target host matching '$Target'." 
+  }
+  
+  # Check if file exists using RTR
+  $Script = "Test-Path $Filepath"
+  $Rtr = Invoke-FalconRtr -Command runscript -Argument ('-Raw=```{0}```' -f $Script) -HostId $HostId
+  
+  # Contain if file exists
+  if (($Rtr.stdout).Trim() -eq 'True') {
+    Write-Host "File '$Filepath' found on '$Target' - initiating containment"
+    Invoke-FalconHostAction -Name contain -Id $HostId
+  } else {
+    Write-Host "File '$Filepath' not found on '$Target'"
+  }
+} catch {
+  throw $_
+}
+```
+
+<Warning>
+  Admin RTR commands require the `Real Time Response Admin: Write` permission. Regular RTR commands only require `Real Time Response: Write`. Always validate that the session is established before executing commands.
+</Warning>
+
+## Session Management
+
+Manually manage RTR sessions for complex workflows.
+
+```powershell
+# Start individual session
+$Session = Start-FalconSession -Id $HostId -Timeout 60
+
+# Check session status
+Get-FalconSession -Id $Session.session_id
+
+# Execute multiple commands in same session
+Invoke-FalconAdminCommand -Command 'cd' -Argument 'C:\Windows\System32' -SessionId $Session.session_id
+Invoke-FalconAdminCommand -Command 'ls' -SessionId $Session.session_id
+
+# Remove session when done
+Remove-FalconSession -Id $Session.session_id
+```
+
+<Note>
+  RTR sessions timeout after 10 minutes of inactivity by default. Use batch sessions for multiple hosts to improve efficiency and reduce API calls.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bulk Operations" icon="list-check" href="/examples/bulk-operations">
+    Perform operations at scale
+  </Card>
+  <Card title="Host Operations" icon="server" href="/examples/host-operations">
+    Manage hosts and containment
+  </Card>
+</CardGroup>

@@ -1,0 +1,277 @@
+---
+title: Detections
+description: Search for Falcon Cloud Security Indicators of Attack and Misconfiguration
+---
+
+## Get-FalconCloudIoa
+
+Search for Falcon Cloud Security Indicators of Attack (IOA).
+
+**Required Permission:** `CSPM registration: Read`
+
+**Alias:** `Get-FalconHorizonIoa`
+
+### Syntax
+
+```powershell
+Get-FalconCloudIoa -CloudPlatform <string> [-AccountId <string>] [-AwsAccountId <string>] 
+  [-AzureSubscriptionId <string>] [-AzureTenantId <string>] [-ResourceId <string[]>] 
+  [-ResourceUuid <string[]>] [-Severity <string>] [-Region <string>] [-Service <string>] 
+  [-State <string>] [-Since <string>] [-DateTimeSince <string>] [-Limit <int32>] 
+  [-NextToken <string>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="CloudPlatform" type="string" required>
+  Cloud platform to search.
+  
+  **Valid values:** `aws`, `azure`
+  
+  **Aliases:** `cloud_provider`, `cloud_platform`
+</ParamField>
+
+<ParamField path="AccountId" type="string">
+  Cloud account identifier. Can be provided via pipeline.
+  
+  **Aliases:** `account_id`
+</ParamField>
+
+<ParamField path="AwsAccountId" type="string">
+  AWS account identifier (12-digit number).
+  
+  **Pattern:** `^\d{12}$`
+  
+  **Aliases:** `aws_account_id`
+</ParamField>
+
+<ParamField path="AzureSubscriptionId" type="string">
+  Azure subscription identifier (GUID format).
+  
+  **Pattern:** UUID/GUID format
+  
+  **Aliases:** `azure_subscription_id`, `subscription_id`
+</ParamField>
+
+<ParamField path="AzureTenantId" type="string">
+  Azure tenant identifier (GUID format).
+  
+  **Pattern:** UUID/GUID format
+  
+  **Aliases:** `azure_tenant_id`, `tenant_id`
+</ParamField>
+
+<ParamField path="ResourceId" type="string[]">
+  Resource identifier(s) to filter results.
+  
+  **Aliases:** `resource_id`
+</ParamField>
+
+<ParamField path="ResourceUuid" type="string[]">
+  Resource UUID(s) to filter results.
+  
+  **Aliases:** `resource_uuid`
+</ParamField>
+
+<ParamField path="Severity" type="string">
+  Indicator of Attack severity level.
+  
+  **Valid values:** `High`, `Medium`, `Informational`
+</ParamField>
+
+<ParamField path="Service" type="string">
+  Cloud service to filter results.
+  
+  **Valid values include:** `ACM`, `ACR`, `App Engine`, `AppService`, `BigQuery`, `Cloud Load Balancing`, `Cloud Logging`, `Cloud SQL`, `Cloud Storage`, `CloudFormation`, `CloudTrail`, `CloudWatch Logs`, `Cloudfront`, `Compute Engine`, `Config`, `Disk`, `DynamoDB`, `EBS`, `EC2`, `ECR`, `EFS`, `EKS`, `ELB`, `EMR`, `Elasticache`, `GuardDuty`, `IAM`, `Identity`, `KMS`, `KeyVault`, `Kinesis`, `Kubernetes`, `Lambda`, `LoadBalancer`, `Monitor`, `NLB/ALB`, `NetworkSecurityGroup`, `PostgreSQL`, `RDS`, `Redshift`, `S3`, `SES`, `SNS`, `SQLDatabase`, `SQLServer`, `SQS`, `SSM`, `Serverless Application Repository`, `StorageAccount`, `Subscriptions`, `VPC`, `VirtualMachine`, `VirtualNetwork`
+</ParamField>
+
+<ParamField path="State" type="string">
+  Indicator of Attack state.
+  
+  **Valid values:** `open`, `closed`
+</ParamField>
+
+<ParamField path="Since" type="string">
+  Filter events using a duration string (e.g., `24h`, `7d`, `30d`).
+</ParamField>
+
+<ParamField path="DateTimeSince" type="string">
+  Include results that occur after a specific date and time (RFC3339 format).
+  
+  **Aliases:** `date_time_since`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request.
+  
+  **Range:** 1-1000
+</ParamField>
+
+<ParamField path="NextToken" type="string">
+  Pagination token to retrieve the next set of results.
+  
+  **Aliases:** `next_token`
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell AWS IOAs
+# Get all high severity IOAs for AWS
+Get-FalconCloudIoa -CloudPlatform aws -Severity High -All
+
+# Get IOAs for specific AWS account
+Get-FalconCloudIoa -CloudPlatform aws -AwsAccountId 123456789012 -State open
+```
+
+```powershell Azure IOAs
+# Get IOAs for Azure subscription
+Get-FalconCloudIoa -CloudPlatform azure -AzureSubscriptionId 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+
+# Get Azure IOAs for specific service
+Get-FalconCloudIoa -CloudPlatform azure -Service 'VirtualMachine' -Severity High
+```
+
+```powershell Time-based filtering
+# Get IOAs from the last 24 hours
+Get-FalconCloudIoa -CloudPlatform aws -Since 24h
+
+# Get IOAs since specific date/time
+Get-FalconCloudIoa -CloudPlatform aws -DateTimeSince '2026-03-01T00:00:00Z'
+```
+
+```powershell Service-specific search
+# Get S3-related IOAs
+Get-FalconCloudIoa -CloudPlatform aws -Service S3 -State open -All
+
+# Get Kubernetes IOAs
+Get-FalconCloudIoa -CloudPlatform aws -Service Kubernetes -Severity High
+```
+</CodeGroup>
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconCloudIoa](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconCloudIoa)
+
+---
+
+## Get-FalconCloudIom
+
+Search for Falcon Cloud Security Indicators of Misconfiguration (IOM).
+
+**Required Permission:** `CSPM registration: Read`
+
+**Alias:** `Get-FalconHorizonIom`
+
+### Syntax
+
+```powershell
+# Search for IOMs
+Get-FalconCloudIom [-Filter <string>] [-Sort <string>] [-Limit <int>] [-Offset <int>] 
+  [-NextToken <string>] [-Detailed] [-All] [-Total]
+
+# Get specific IOMs by ID
+Get-FalconCloudIom -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Falcon Cloud Security Indicator of Misconfiguration identifier(s). Can be provided via pipeline.
+  
+  **Aliases:** `ids`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+  
+  **Valid values:** `account_name.asc`, `account_name.desc`, `account_id.asc`, `account_id.desc`, `attack_types.asc`, `attack_types.desc`, `azure_subscription_id.asc`, `azure_subscription_id.desc`, `cloud_provider.asc`, `cloud_provider.desc`, `cloud_service_keyword.asc`, `cloud_service_keyword.desc`, `status.asc`, `status.desc`, `is_managed.asc`, `is_managed.desc`, `policy_id.asc`, `policy_id.desc`, `policy_type.asc`, `policy_type.desc`, `resource_id.asc`, `resource_id.desc`, `region.asc`, `region.desc`, `scan_time.asc`, `scan_time.desc`, `severity.asc`, `severity.desc`, `severity_string.asc`, `severity_string.desc`, `timestamp.asc`, `timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request.
+  
+  **Range:** 1-1000
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results (used for pagination).
+</ParamField>
+
+<ParamField path="NextToken" type="string">
+  Pagination token to retrieve the next set of results.
+  
+  **Aliases:** `next_token`
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for IOMs.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Search IOMs
+# Get all open misconfigurations
+Get-FalconCloudIom -Filter "status:'open'" -All
+
+# Get high severity misconfigurations sorted by severity
+Get-FalconCloudIom -Filter "severity_string:'High'" -Sort severity.desc -Limit 100
+```
+
+```powershell Detailed information
+# Get detailed IOM information
+Get-FalconCloudIom -Filter "cloud_provider:'aws'" -Detailed -All
+```
+
+```powershell Filter by cloud provider
+# Get Azure misconfigurations
+Get-FalconCloudIom -Filter "cloud_provider:'azure'" -Sort scan_time.desc
+
+# Get AWS misconfigurations for specific account
+Get-FalconCloudIom -Filter "cloud_provider:'aws'+account_id:'123456789012'"
+```
+
+```powershell Retrieve by ID
+# Get specific IOMs by their IDs
+$IomIds = @('iom-abc123...', 'iom-def456...')
+Get-FalconCloudIom -Id $IomIds
+```
+
+```powershell Policy-based search
+# Get misconfigurations for specific policy
+Get-FalconCloudIom -Filter "policy_id:'12345'" -All
+```
+</CodeGroup>
+
+### Notes
+
+- Use the `-Detailed` switch to retrieve complete IOM information
+- The `-Filter` parameter supports complex FQL queries for precise filtering
+- Results can be sorted by multiple properties including severity, timestamp, and account information
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconCloudIom](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconCloudIom)

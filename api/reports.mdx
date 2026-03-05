@@ -1,0 +1,385 @@
+---
+title: "Scheduled Reports"
+description: "Search, execute, and download scheduled reports and searches in CrowdStrike Falcon"
+---
+
+## Overview
+
+The Scheduled Reports API allows you to manage scheduled reports and searches, execute reports on-demand, retry failed executions, and download generated report files.
+
+<Note>
+  All scheduled report operations require **Scheduled Reports: Read** permission.
+</Note>
+
+## Get-FalconScheduledReport
+
+Search for scheduled reports or searches and retrieve their execution information.
+
+### Syntax
+
+```powershell
+# Search for scheduled reports
+Get-FalconScheduledReport [[-Filter] <string>] [[-Query] <string>] [[-Sort] <string>] [[-Limit] <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total]
+
+# Get report by ID
+Get-FalconScheduledReport -Id <string[]>
+
+# Search for report executions
+Get-FalconScheduledReport -Execution [[-Filter] <string>] [[-Query] <string>] [[-Sort] <string>] [[-Limit] <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total]
+
+# Get execution by ID
+Get-FalconScheduledReport -Execution -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Scheduled report or scheduled search identifier. Must be 32-character hexadecimal string.
+  
+  **Aliases:** `ids`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Example: `last_execution_on:>'2024-01-01'`
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields.
+  
+  **Aliases:** `q`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values:
+  - `created_on.asc`
+  - `created_on.desc`
+  - `last_updated_on.asc`
+  - `last_updated_on.desc`
+  - `last_execution_on.asc`
+  - `last_execution_on.desc`
+  - `next_execution_on.asc`
+  - `next_execution_on.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32" default="500">
+  Maximum number of results per request. Range: 1-5000.
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results for pagination.
+</ParamField>
+
+<ParamField path="Execution" type="switch">
+  Retrieve information about scheduled report execution(s) instead of report definitions.
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information including full report metadata.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell List all reports
+Get-FalconScheduledReport -Detailed -All
+```
+
+```powershell Get specific report
+Get-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+```
+
+```powershell Search by name
+Get-FalconScheduledReport -Query 'Detection' -Detailed
+```
+
+```powershell Recent executions
+Get-FalconScheduledReport -Execution -Filter "last_execution_on:>'2024-01-01'" -Detailed -All
+```
+
+```powershell Get execution details
+Get-FalconScheduledReport -Execution -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+```
+
+```powershell Count total reports
+Get-FalconScheduledReport -Total
+```
+
+</CodeGroup>
+
+### Returns
+
+Scheduled report or execution information including report ID, name, schedule, format, last execution time, and status.
+
+---
+
+## Invoke-FalconScheduledReport
+
+Execute a scheduled report immediately, outside of its normal schedule.
+
+### Syntax
+
+```powershell
+Invoke-FalconScheduledReport [-Id] <string>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Report identifier. Must be 32-character hexadecimal string.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Execute report
+Invoke-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+```
+
+```powershell Execute multiple reports
+$reports = @('a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6', 'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7')
+$reports | ForEach-Object { Invoke-FalconScheduledReport -Id $_ }
+```
+
+```powershell Pipeline execution
+Get-FalconScheduledReport -Query 'Weekly' | Invoke-FalconScheduledReport
+```
+
+</CodeGroup>
+
+### Returns
+
+Execution confirmation with execution ID for tracking.
+
+---
+
+## Redo-FalconScheduledReport
+
+Retry a failed scheduled report execution.
+
+### Syntax
+
+```powershell
+Redo-FalconScheduledReport [-Id] <string>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Report identifier for the failed execution to retry. Must be 32-character hexadecimal string.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Retry failed execution
+Redo-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+```
+
+```powershell Retry multiple failed reports
+$failed = Get-FalconScheduledReport -Execution -Filter "status:'failed'" -Detailed
+$failed | ForEach-Object { Redo-FalconScheduledReport -Id $_.id }
+```
+
+```powershell Pipeline retry
+'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6' | Redo-FalconScheduledReport
+```
+
+</CodeGroup>
+
+### Returns
+
+Retry confirmation with new execution ID.
+
+---
+
+## Receive-FalconScheduledReport
+
+Download a scheduled report or search result file.
+
+### Syntax
+
+```powershell
+Receive-FalconScheduledReport [[-Path] <object>] [-Id] <string> [-Force]
+```
+
+### Parameters
+
+<ParamField path="Path" type="object">
+  Destination path for the downloaded report file. Can be:
+  - A string file path
+  - A report object with `result_metadata.report_file_name`
+  - A report object with `report_params.format`
+  
+  If not provided and `Id` is given, the cmdlet attempts to determine the filename automatically.
+  
+  **Aliases:** `result_metadata`, `last_execution`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Report execution identifier. Must be 32-character hexadecimal string.
+  
+  **Aliases:** `ids`
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present at the destination path.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Download with auto-filename
+Receive-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+```
+
+```powershell Specify download path
+Receive-FalconScheduledReport -Path 'C:\Reports\detections.csv' -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+```
+
+```powershell Force overwrite
+Receive-FalconScheduledReport -Path 'C:\Reports\report.pdf' -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6' -Force
+```
+
+```powershell Pipeline download
+Get-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6' | Receive-FalconScheduledReport
+```
+
+```powershell Download latest execution
+$report = Get-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6' -Detailed
+Receive-FalconScheduledReport -Path $report -Id $report.last_execution.id
+```
+
+</CodeGroup>
+
+<Tip>
+  When passing a report object to `-Path`, the cmdlet automatically extracts the filename and execution ID, making downloads easier.
+</Tip>
+
+### Returns
+
+Downloaded file saved to the specified or automatically determined path.
+
+---
+
+## Common Workflows
+
+### Execute and Download Report
+
+```powershell
+# Execute a report
+$execution = Invoke-FalconScheduledReport -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+
+# Wait for completion (poll every 30 seconds)
+do {
+  Start-Sleep -Seconds 30
+  $status = Get-FalconScheduledReport -Execution -Id $execution.id
+} while ($status.status -eq 'running')
+
+# Download completed report
+if ($status.status -eq 'done') {
+  Receive-FalconScheduledReport -Path 'C:\Reports\latest.csv' -Id $execution.id
+}
+```
+
+### Retry All Failed Reports
+
+```powershell
+# Find all failed executions from the last week
+$lastWeek = (Get-Date).AddDays(-7).ToString('yyyy-MM-dd')
+$failed = Get-FalconScheduledReport -Execution -Filter "status:'failed'+last_execution_on:>'$lastWeek'" -Detailed -All
+
+# Retry each failed execution
+foreach ($report in $failed) {
+  Write-Host "Retrying report: $($report.id)"
+  Redo-FalconScheduledReport -Id $report.id
+}
+```
+
+### Download All Recent Reports
+
+```powershell
+# Get all executions from the last 24 hours
+$yesterday = (Get-Date).AddDays(-1).ToString('yyyy-MM-dd')
+$executions = Get-FalconScheduledReport -Execution -Filter "last_execution_on:>'$yesterday'+status:'done'" -Detailed -All
+
+# Create download directory
+$downloadDir = 'C:\Reports\' + (Get-Date -Format 'yyyy-MM-dd')
+New-Item -Path $downloadDir -ItemType Directory -Force
+
+# Download each completed report
+foreach ($exec in $executions) {
+  $filename = if ($exec.result_metadata.report_file_name) {
+    $exec.result_metadata.report_file_name
+  } else {
+    "$($exec.id).$($exec.report_params.format)"
+  }
+  
+  $path = Join-Path $downloadDir $filename
+  Receive-FalconScheduledReport -Path $path -Id $exec.id
+}
+```
+
+### Monitor Report Status
+
+```powershell
+# Get all scheduled reports
+$reports = Get-FalconScheduledReport -Detailed -All
+
+# Display summary
+$reports | Select-Object id, name, 
+  @{N='LastRun';E={$_.last_execution.last_execution_on}},
+  @{N='Status';E={$_.last_execution.status}},
+  @{N='NextRun';E={$_.next_execution_on}} |
+  Format-Table -AutoSize
+
+# Export to CSV
+$reports | Select-Object id, name, schedule, 
+  @{N='last_execution_on';E={$_.last_execution.last_execution_on}},
+  @{N='status';E={$_.last_execution.status}} |
+  Export-Csv 'C:\Reports\report_status.csv' -NoTypeInformation
+```
+
+---
+
+## Report Formats
+
+Scheduled reports can be generated in various formats:
+
+- **CSV** - Comma-separated values for data analysis
+- **PDF** - Formatted document for sharing
+- **JSON** - Structured data for programmatic processing
+
+The format is determined when the report is configured in the Falcon console.
+
+---
+
+## Permissions Required
+
+| Operation | Permission |
+|-----------|------------|
+| Get-FalconScheduledReport | Scheduled Reports: Read |
+| Invoke-FalconScheduledReport | Scheduled Reports: Read |
+| Redo-FalconScheduledReport | Scheduled Reports: Read |
+| Receive-FalconScheduledReport | Scheduled Reports: Read |
+
+---
+
+## Related Commands
+
+- `Get-FalconReportExecution` - Get detailed execution information
+- `Get-FalconReport` - Manage report definitions
+- `Export-FalconReport` - Export custom reports

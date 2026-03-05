@@ -1,0 +1,357 @@
+---
+title: Detection Management
+description: Query, filter, assign, and manage detections at scale
+icon: shield-halved
+---
+
+Manage detections including querying, filtering, assignment, status updates, and bulk operations.
+
+## Query Detections
+
+Retrieve detections using filters and sorting.
+
+```powershell
+# Get all detections (paginated automatically)
+$Detections = Get-FalconDetection -Detailed -All
+
+# Get detections from the last 24 hours
+$Recent = Get-FalconDetection -Filter "last_behavior:>'now-24h'" -Detailed -All
+
+# Get new/unassigned detections
+$New = Get-FalconDetection -Filter "status:'new'" -Detailed -All
+
+# Get detections with specific severity
+$Critical = Get-FalconDetection -Filter "max_severity_displayname:'Critical'" -Detailed -All
+
+# Sort by last behavior (most recent first)
+$Sorted = Get-FalconDetection -Sort last_behavior.desc -Limit 100 -Detailed
+
+# Get total count only
+$Total = Get-FalconDetection -Total
+Write-Host "Total detections: $Total"
+```
+
+## Filter by Behavior
+
+Find detections based on specific behaviors or indicators.
+
+```powershell
+# Find detections involving a specific filename
+$Filename = 'malware.exe'
+$Detections = Get-FalconDetection -Filter "behaviors.filename:'$Filename'" -Detailed -All
+
+# Find detections with specific command line
+$CmdLine = 'powershell'
+$Detections = Get-FalconDetection -Filter "behaviors.cmdline:*'$CmdLine'*" -Detailed -All
+
+# Find detections by tactic
+$Detections = Get-FalconDetection -Filter "behaviors.tactic:'Persistence'" -Detailed -All
+
+# Find detections by technique
+$Detections = Get-FalconDetection -Filter "behaviors.technique:'Scheduled Task'" -Detailed -All
+```
+
+## Assign Detections
+
+Assign detections to users for investigation.
+
+### Assign Detections by Filename to User
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Username,
+  
+  [Parameter(Mandatory)]
+  [string]$Filename
+)
+
+# Get user identifier
+$Uuid = Get-FalconUser -Username $Username
+if (!$Uuid) { 
+  throw "No user identifier found for '$Username'." 
+}
+
+# Check if detections exist
+if (!(Get-FalconDetection -Filter "behaviors.filename:'$Filename'")) {
+  throw "No detections found for '$Filename'."
+}
+
+# Assign detections in batches of 1,000
+do {
+  if ($Id) { Start-Sleep -Seconds 5 }
+  
+  $Param = @{
+    Filter = "behaviors.filename:'$Filename'+assigned_to_uuid:!'$Uuid'"
+    Limit = 1000
+    OutVariable = 'Id'
+  }
+  
+  $Edit = Get-FalconDetection @Param | Edit-FalconDetection -AssignedToUuid $Uuid
+  
+  if ($Edit.writes.resources_affected) {
+    Write-Host "Assigned $($Edit.writes.resources_affected) detection(s) to $Username..."
+  }
+} while ($Id)
+
+Write-Host "Assignment complete."
+```
+
+### Assign Detection to Current User
+
+```powershell
+# Get current user UUID
+$CurrentUser = Get-FalconUser -Username (whoami)
+
+# Assign specific detection
+$DetectionId = 'ldt:abc123...'
+Edit-FalconDetection -Id $DetectionId -AssignedToUuid $CurrentUser
+```
+
+## Update Detection Status
+
+Change detection status and add comments.
+
+```powershell
+# Mark detection as in progress
+$DetectionId = 'ldt:abc123...'
+Edit-FalconDetection -Id $DetectionId -Status in_progress
+
+# Mark as true positive
+Edit-FalconDetection -Id $DetectionId -Status true_positive
+
+# Mark as false positive with comment
+$Param = @{
+  Id = $DetectionId
+  Status = 'false_positive'
+  Comment = 'Confirmed safe - internal security tool'
+}
+Edit-FalconDetection @Param
+
+# Mark as closed
+Edit-FalconDetection -Id $DetectionId -Status closed
+```
+
+## Hide/Show Detections
+
+Control detection visibility in the console.
+
+### Hide Detections by Filename
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Filename
+)
+
+# Create output file to track hidden detections
+$OutputFile = Join-Path (Get-Location).Path "hidden_detections_$(Get-Date -Format FileDateTime).txt"
+
+# Check if detections exist
+if ($null -eq (Get-FalconDetection -Filter "behaviors.filename:'$Filename'" -Total)) {
+  throw "No detections found for '$Filename'."
+}
+
+# Hide detections in batches of 1,000
+do {
+  if ($Id) { Start-Sleep -Seconds 5 }
+  
+  $Edit = Get-FalconDetection -Filter "behaviors.filename:'$Filename'" -Limit 1000 -OutVariable Id |
+    Edit-FalconDetection -ShowInUi $false
+  
+  if ($Edit.writes.resources_affected) {
+    Write-Host "Hid $($Edit.writes.resources_affected) detection(s)..."
+    # Output detection IDs to file for reference
+    $Id >> $OutputFile
+  }
+} while ($Id)
+
+if (Test-Path $OutputFile) { 
+  Get-ChildItem $OutputFile | Select-Object FullName,Length,LastWriteTime 
+}
+```
+
+### Show Hidden Detection
+
+```powershell
+# Make detection visible again
+$DetectionId = 'ldt:abc123...'
+Edit-FalconDetection -Id $DetectionId -ShowInUi $true
+```
+
+## Bulk Detection Operations
+
+Perform actions on multiple detections.
+
+```powershell
+# Get all 'new' detections from last 7 days and assign to SOC team lead
+$SocLead = Get-FalconUser -Username 'soc.lead@company.com'
+$Filter = "status:'new'+last_behavior:>'now-7d'"
+
+$Detections = Get-FalconDetection -Filter $Filter -All
+if ($Detections) {
+  $Detections | Edit-FalconDetection -AssignedToUuid $SocLead -Status in_progress
+  Write-Host "Assigned $($Detections.Count) detections to SOC lead"
+}
+```
+
+## Export Detections
+
+Export detection data for reporting or analysis.
+
+### Export to JSON
+
+```powershell
+# Export detections to JSON with full details
+$Detections = Get-FalconDetection -Filter "last_behavior:>'now-24h'" -Detailed -All
+$OutputFile = Join-Path (Get-Location).Path "detections_$(Get-Date -Format FileDateTime).json"
+
+$Detections | ConvertTo-Json -Depth 16 | Out-File -FilePath $OutputFile
+Get-ChildItem $OutputFile | Select-Object FullName,Length,LastWriteTime
+```
+
+### Export to CSV
+
+```powershell
+# Export detections to CSV with selected fields
+$Detections = Get-FalconDetection -Detailed -All | Select-Object @(
+  'detection_id',
+  @{label='hostname';expression={$_.device.hostname}},
+  @{label='status';expression={$_.status}},
+  @{label='severity';expression={$_.max_severity_displayname}},
+  @{label='first_behavior';expression={$_.first_behavior}},
+  @{label='last_behavior';expression={$_.last_behavior}},
+  @{label='assigned_to';expression={$_.assigned_to_name}}
+)
+
+$Detections | Export-Csv -Path 'detections.csv' -NoTypeInformation
+```
+
+## Detection Patterns
+
+Identify patterns in detections for investigation.
+
+```powershell
+# Group detections by hostname
+$ByHost = Get-FalconDetection -Detailed -All | Group-Object -Property {$_.device.hostname} | 
+  Sort-Object Count -Descending
+
+Write-Host "Top 10 hosts with most detections:"
+$ByHost | Select-Object -First 10 | ForEach-Object {
+  Write-Host "  $($_.Name): $($_.Count) detections"
+}
+
+# Group by tactic
+$ByTactic = Get-FalconDetection -Detailed -All | ForEach-Object {
+  $_.behaviors | Select-Object -ExpandProperty tactic -Unique
+} | Group-Object | Sort-Object Count -Descending
+
+Write-Host "`nMost common tactics:"
+$ByTactic | Select-Object -First 5 | ForEach-Object {
+  Write-Host "  $($_.Name): $($_.Count)"
+}
+```
+
+## Advanced Filtering
+
+Combine multiple filters for precise queries.
+
+```powershell
+# Multiple conditions with AND
+$Filter = "status:'new'+max_severity_displayname:'Critical'+behaviors.tactic:'Execution'"
+$Detections = Get-FalconDetection -Filter $Filter -Detailed -All
+
+# Date range with severity
+$Filter = "first_behavior:>'2024-01-01'+first_behavior:<'2024-01-31'+max_severity:'70'"
+$Detections = Get-FalconDetection -Filter $Filter -Detailed -All
+
+# Exclude assigned detections
+$Filter = "status:'new'+assigned_to_uuid:!''"
+$Detections = Get-FalconDetection -Filter $Filter -Detailed -All
+
+# Multiple filenames (OR)
+$Filter = "behaviors.filename:['malware.exe','suspicious.dll']"
+$Detections = Get-FalconDetection -Filter $Filter -Detailed -All
+```
+
+## Detection Workflow
+
+Complete workflow for detection triage.
+
+```powershell
+# Get current user for assignment
+$CurrentUser = Get-FalconUser -Username (whoami)
+
+# Get new critical detections
+$Detections = Get-FalconDetection -Filter "status:'new'+max_severity_displayname:'Critical'" -Detailed -All
+
+foreach ($Detection in $Detections) {
+  Write-Host "`nProcessing detection: $($Detection.detection_id)"
+  Write-Host "  Host: $($Detection.device.hostname)"
+  Write-Host "  Severity: $($Detection.max_severity_displayname)"
+  Write-Host "  Behaviors: $($Detection.behaviors.Count)"
+  
+  # Assign to self and mark as in progress
+  Edit-FalconDetection -Id $Detection.detection_id -AssignedToUuid $CurrentUser -Status in_progress
+  
+  # Add your investigation logic here
+  
+  # Example: Auto-contain hosts with specific indicators
+  $SuspiciousFiles = @('malware.exe', 'ransomware.dll')
+  $MatchingBehaviors = $Detection.behaviors | Where-Object {
+    $_.filename -in $SuspiciousFiles
+  }
+  
+  if ($MatchingBehaviors) {
+    Write-Host "  ACTION: Containing host due to suspicious file"
+    Invoke-FalconHostAction -Name contain -Id $Detection.device.device_id
+    
+    # Update detection with comment
+    Edit-FalconDetection -Id $Detection.detection_id -Comment "Auto-contained: Matched known malware signature"
+  }
+}
+```
+
+<Warning>
+  Always test detection filters with `-Limit` before using `-All` to avoid retrieving thousands of detections. Use `-Total` to check counts first.
+</Warning>
+
+## Detection Metrics
+
+Generate metrics for reporting.
+
+```powershell
+# Daily detection summary
+$Today = Get-FalconDetection -Filter "first_behavior:>'now-24h'" -Total
+$Critical = Get-FalconDetection -Filter "first_behavior:>'now-24h'+max_severity_displayname:'Critical'" -Total
+$New = Get-FalconDetection -Filter "status:'new'+first_behavior:>'now-24h'" -Total
+$Assigned = Get-FalconDetection -Filter "first_behavior:>'now-24h'+assigned_to_uuid:!''" -Total
+
+Write-Host "Detection Summary (Last 24 Hours)"
+Write-Host "  Total: $Today"
+Write-Host "  Critical: $Critical"
+Write-Host "  New (Unassigned): $New"
+Write-Host "  Assigned: $Assigned"
+Write-Host "  Assignment Rate: $(($Assigned/$Today*100).ToString('0.0'))%"
+```
+
+<Note>
+  Detection IDs follow the format `ldt:<UUID>` for detections. Use the full detection_id when updating or querying specific detections.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Host Operations" icon="server" href="/examples/host-operations">
+    Manage and contain hosts
+  </Card>
+  <Card title="Custom IOC Workflows" icon="magnifying-glass" href="/examples/custom-ioc-workflows">
+    Work with custom indicators
+  </Card>
+</CardGroup>

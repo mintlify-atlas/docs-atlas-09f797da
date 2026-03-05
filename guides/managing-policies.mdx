@@ -1,0 +1,419 @@
+---
+title: Managing Policies
+description: Create, configure, and assign security policies to host groups
+---
+
+PSFalcon enables comprehensive management of CrowdStrike Falcon security policies, including Prevention, Response, Sensor Update, Firewall, and Device Control policies.
+
+## Policy Types
+
+Falcon uses several policy types to control sensor behavior:
+
+<CardGroup cols={2}>
+  <Card title="Prevention" icon="shield-halved">
+    Malware prevention, exploit blocking, and behavioral analysis settings
+  </Card>
+  <Card title="Response" icon="bolt">
+    Real-Time Response access and script execution permissions
+  </Card>
+  <Card title="Sensor Update" icon="download">
+    Sensor version deployment and update scheduling
+  </Card>
+  <Card title="Firewall" icon="firewall">
+    Network firewall rules and configurations
+  </Card>
+  <Card title="Device Control" icon="usb-drive">
+    USB and peripheral device access controls
+  </Card>
+</CardGroup>
+
+## Prevention Policies
+
+### Search and Retrieve Policies
+
+```powershell
+# List all prevention policies
+Get-FalconPreventionPolicy -All
+
+# Get detailed policy information
+Get-FalconPreventionPolicy -Detailed -All
+
+# Search by name
+Get-FalconPreventionPolicy -Filter "name:'Production*'" -Detailed
+
+# Get policy by ID
+$Policy = Get-FalconPreventionPolicy -Id 'abc123def456789012345678901234ab'
+```
+
+### Create Prevention Policy
+
+```powershell
+# Create a new prevention policy
+$NewPolicy = New-FalconPreventionPolicy -Name 'Strict Prevention' `
+  -PlatformName Windows `
+  -Description 'High security settings for production servers'
+
+Write-Host "Created policy: $($NewPolicy.id)"
+```
+
+### Modify Prevention Settings
+
+```powershell
+# Get current policy settings
+$Policy = Get-FalconPreventionPolicy -Id $PolicyId
+
+# Update policy settings
+$Settings = @(
+    @{ id = 'detection'; value = @{ enabled = $true } }
+    @{ id = 'prevention'; value = @{ enabled = $true } }
+    @{ id = 'AdwarePUP'; value = @{ enabled = $true; detection = 'MODERATE' } }
+    @{ id = 'OnSensorMLSlider'; value = @{ detection = 'AGGRESSIVE'; prevention = 'AGGRESSIVE' } }
+)
+
+Edit-FalconPreventionPolicy -Id $PolicyId -Setting $Settings
+```
+
+### Common Prevention Settings
+
+<CodeGroup>
+
+```powershell Malware Protection
+# Enable aggressive malware detection
+$Settings = @(
+    @{ id = 'detection'; value = @{ enabled = $true } }
+    @{ id = 'prevention'; value = @{ enabled = $true } }
+    @{ id = 'OnSensorMLSlider'; value = @{ 
+        detection = 'AGGRESSIVE'
+        prevention = 'AGGRESSIVE' 
+    }}
+)
+
+Edit-FalconPreventionPolicy -Id $PolicyId -Setting $Settings
+```
+
+```powershell Exploit Prevention
+# Configure exploit blocking
+$Settings = @(
+    @{ id = 'ExploitMitigation'; value = @{ enabled = $true; mode = 'AGGRESSIVE' } }
+    @{ id = 'MemoryScanningOnWrite'; value = @{ enabled = $true } }
+)
+
+Edit-FalconPreventionPolicy -Id $PolicyId -Setting $Settings
+```
+
+```powershell Behavioral Analysis
+# Enable behavioral indicators
+$Settings = @(
+    @{ id = 'CloudAntiMalware'; value = @{ enabled = $true } }
+    @{ id = 'SensorAntiMalware'; value = @{ enabled = $true } }
+    @{ id = 'QuarantineOnWrite'; value = @{ enabled = $true } }
+)
+
+Edit-FalconPreventionPolicy -Id $PolicyId -Setting $Settings
+```
+
+</CodeGroup>
+
+## Response Policies
+
+Control Real-Time Response access for hosts:
+
+```powershell
+# List response policies
+Get-FalconResponsePolicy -Detailed -All
+
+# Create new response policy
+$ResponsePolicy = New-FalconResponsePolicy -Name 'IR Team RTR Access' `
+  -PlatformName Windows `
+  -Description 'RTR access for incident response team'
+
+# Update response policy settings
+$Settings = @(
+    @{ id = 'real_time_response'; value = @{ enabled = $true } }
+)
+
+Edit-FalconResponsePolicy -Id $ResponsePolicy.id -Setting $Settings
+```
+
+## Sensor Update Policies
+
+Manage sensor version deployment:
+
+```powershell
+# Get available sensor versions
+Get-FalconSensorUpdateKernel -Filter "platform:'Windows'" -Detailed
+
+# Create sensor update policy
+$UpdatePolicy = New-FalconSensorUpdatePolicy -Name 'Staged Rollout' `
+  -PlatformName Windows `
+  -Description 'Gradual sensor updates'
+
+# Configure update schedule
+$Settings = @(
+    @{ 
+        id = 'scheduler' 
+        value = @{ 
+            enabled = $true
+            timezone = 'America/New_York'
+            day_of_week = @('Monday', 'Wednesday')
+            time_of_day = '02:00'
+        } 
+    }
+)
+
+Edit-FalconSensorUpdatePolicy -Id $UpdatePolicy.id -Setting $Settings
+```
+
+## Firewall Management Policies
+
+```powershell
+# List firewall policies
+Get-FalconFirewallPolicy -Detailed -All
+
+# Create firewall policy
+$FwPolicy = New-FalconFirewallPolicy -Name 'Server Firewall Rules' `
+  -PlatformName Windows `
+  -Description 'Custom firewall rules for servers'
+
+# Get firewall rule groups
+Get-FalconFirewallGroup -Detailed -All
+```
+
+## Device Control Policies
+
+Manage USB and peripheral device access:
+
+```powershell
+# List device control policies
+Get-FalconDeviceControlPolicy -Detailed -All
+
+# Create device control policy
+$DcPolicy = New-FalconDeviceControlPolicy -Name 'USB Restrictions' `
+  -PlatformName Windows `
+  -Description 'Block unauthorized USB devices'
+
+# Configure USB blocking
+$Settings = @(
+    @{ 
+        id = 'usb_mass_storage'
+        value = @{ enabled = $true; action = 'FULL_ACCESS' }
+    }
+)
+
+Edit-FalconDeviceControlPolicy -Id $DcPolicy.id -Setting $Settings
+```
+
+## Policy Assignment
+
+### Assign Policies to Host Groups
+
+```powershell
+# Get host group
+$Group = Get-FalconHostGroup -Filter "name:'Production Servers'"
+
+# Assign prevention policy to group
+Invoke-FalconPreventionPolicyAction -Name assign `
+  -Id $PreventionPolicyId `
+  -GroupId $Group.id
+
+# Assign multiple policies
+$Policies = @{
+    Prevention = $PreventionPolicyId
+    Response = $ResponsePolicyId
+    SensorUpdate = $SensorUpdatePolicyId
+}
+
+Invoke-FalconPreventionPolicyAction -Name assign -Id $Policies.Prevention -GroupId $Group.id
+Invoke-FalconResponsePolicyAction -Name assign -Id $Policies.Response -GroupId $Group.id
+Invoke-FalconSensorUpdatePolicyAction -Name assign -Id $Policies.SensorUpdate -GroupId $Group.id
+```
+
+### View Policy Members
+
+```powershell
+# Get hosts assigned to a policy
+Get-FalconPreventionPolicyMember -Id $PolicyId -Detailed -All
+
+# Include members when retrieving policy
+Get-FalconPreventionPolicy -Id $PolicyId -Include members
+```
+
+## Policy Precedence
+
+When a host belongs to multiple groups with different policies, precedence determines which policy applies:
+
+```powershell
+# Set policy precedence (lower number = higher priority)
+Set-FalconPreventionPrecedence -PlatformName Windows `
+  -Id @('policy1', 'policy2', 'policy3')
+
+# View current precedence
+Get-FalconPreventionPolicy -Filter "platform_name:'Windows'" `
+  -Sort precedence.asc `
+  -Detailed
+```
+
+<Note>
+Policies with precedence value `1` take highest priority. Default policies have the lowest precedence.
+</Note>
+
+## Policy Exclusions
+
+### ML Exclusions
+
+```powershell
+# Create ML exclusion
+New-FalconMlExclusion -Value 'C:\\TrustedApp\\*.exe' `
+  -GroupId @($GroupId) `
+  -Comment 'Exclude trusted application'
+
+# List ML exclusions
+Get-FalconMlExclusion -Detailed -All
+
+# Remove ML exclusion
+Remove-FalconMlExclusion -Id $ExclusionId
+```
+
+### IOA Exclusions
+
+```powershell
+# Create IOA exclusion pattern
+$Pattern = @{
+    name = 'cl_fsevent_ExternalMediaFileWritten'
+    value = 'E:\\Backup\\*'
+}
+
+New-FalconIoaExclusion -PatternName $Pattern.name `
+  -PatternId $Pattern.value `
+  -GroupId @($GroupId) `
+  -Comment 'Exclude backup drive activity'
+
+# List IOA exclusions
+Get-FalconIoaExclusion -Detailed -All
+```
+
+### Sensor Visibility Exclusions
+
+```powershell
+# Create SV exclusion
+New-FalconSvExclusion -Value 'C:\\AppData\\*.tmp' `
+  -GroupId @($GroupId) `
+  -Comment 'Exclude temp files from visibility'
+
+# List SV exclusions
+Get-FalconSvExclusion -Detailed -All
+```
+
+## Policy Management Workflow
+
+<Steps>
+
+<Step title="Create Host Groups">
+```powershell
+# Create groups for different environments
+New-FalconHostGroup -GroupType dynamic -Name 'Production Servers' `
+  -AssignmentRule "platform_name:'Windows'+product_type_desc:'Server'+tags:'Production'"
+
+New-FalconHostGroup -GroupType dynamic -Name 'Development Workstations' `
+  -AssignmentRule "platform_name:'Windows'+product_type_desc:'Workstation'+tags:'Dev'"
+```
+</Step>
+
+<Step title="Create Policies">
+```powershell
+# Create prevention policies for each environment
+$ProdPolicy = New-FalconPreventionPolicy -Name 'Production - Strict' `
+  -PlatformName Windows -Description 'High security for production'
+
+$DevPolicy = New-FalconPreventionPolicy -Name 'Development - Moderate' `
+  -PlatformName Windows -Description 'Balanced security for development'
+```
+</Step>
+
+<Step title="Configure Settings">
+```powershell
+# Apply strict settings to production
+$StrictSettings = @(
+    @{ id = 'detection'; value = @{ enabled = $true } }
+    @{ id = 'prevention'; value = @{ enabled = $true } }
+    @{ id = 'OnSensorMLSlider'; value = @{ detection = 'AGGRESSIVE'; prevention = 'AGGRESSIVE' } }
+)
+
+Edit-FalconPreventionPolicy -Id $ProdPolicy.id -Setting $StrictSettings
+```
+</Step>
+
+<Step title="Assign to Groups">
+```powershell
+# Get groups
+$ProdGroup = Get-FalconHostGroup -Filter "name:'Production Servers'"
+$DevGroup = Get-FalconHostGroup -Filter "name:'Development Workstations'"
+
+# Assign policies
+Invoke-FalconPreventionPolicyAction -Name assign -Id $ProdPolicy.id -GroupId $ProdGroup.id
+Invoke-FalconPreventionPolicyAction -Name assign -Id $DevPolicy.id -GroupId $DevGroup.id
+```
+</Step>
+
+<Step title="Add Exclusions">
+```powershell
+# Add necessary exclusions for dev environment
+New-FalconMlExclusion -Value 'C:\\DevTools\\*.exe' `
+  -GroupId @($DevGroup.id) `
+  -Comment 'Development tools exclusion'
+```
+</Step>
+
+<Step title="Verify Assignments">
+```powershell
+# Check policy members
+Get-FalconPreventionPolicyMember -Id $ProdPolicy.id -Detailed | Measure-Object
+Get-FalconPreventionPolicyMember -Id $DevPolicy.id -Detailed | Measure-Object
+```
+</Step>
+
+</Steps>
+
+## Best Practices
+
+<Warning>
+**Test Before Production**: Always test new policies in a development or staging environment before deploying to production hosts.
+</Warning>
+
+<Note>
+- Use **dynamic host groups** with FQL rules for automatic policy assignment
+- Implement a **precedence strategy** to handle overlapping group membership
+- Document **exclusions** with clear comments explaining their purpose
+- Regularly **audit policy assignments** to ensure proper coverage
+- Use **sensor update policies** to control rollout timing and minimize impact
+</Note>
+
+## Bulk Policy Operations
+
+```powershell
+# Clone policy settings to new policy
+$SourcePolicy = Get-FalconPreventionPolicy -Id $SourcePolicyId
+$NewPolicy = New-FalconPreventionPolicy -Name 'Cloned Policy' `
+  -PlatformName $SourcePolicy.platform_name `
+  -Description "Cloned from $($SourcePolicy.name)"
+
+# Copy settings
+Edit-FalconPreventionPolicy -Id $NewPolicy.id -Setting $SourcePolicy.prevention_settings.settings
+
+# Bulk disable policies
+$PoliciesToDisable = Get-FalconPreventionPolicy -Filter "name:*'Old'*"
+foreach ($Policy in $PoliciesToDisable) {
+    Invoke-FalconPreventionPolicyAction -Name disable -Id $Policy.id
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Working with Hosts" icon="server" href="./working-with-hosts">
+    Organize hosts into groups for policy assignment
+  </Card>
+  <Card title="Threat Intelligence" icon="magnifying-glass" href="./threat-intelligence">
+    Leverage threat intelligence to enhance policies
+  </Card>
+</CardGroup>

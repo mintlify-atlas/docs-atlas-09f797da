@@ -1,0 +1,322 @@
+---
+title: Threat Graph
+description: Navigate threat relationships and analyze attack patterns with Falcon ThreatGraph
+icon: project-diagram
+---
+
+The Threat Graph API provides access to CrowdStrike's ThreatGraph, a unified view of security events and their relationships across your environment. ThreatGraph connects detections, processes, files, network connections, and other entities to reveal attack patterns and lateral movement.
+
+## Overview
+
+Falcon ThreatGraph enables:
+
+- **Entity relationship mapping**: Understand connections between processes, files, users, and network activity
+- **Threat investigation**: Trace attack paths and identify compromised systems
+- **Lateral movement detection**: Discover how threats spread across your environment
+- **Indicator analysis**: Find hosts where specific indicators have been observed
+
+ThreatGraph uses a vertex-and-edge model where entities (vertexes) are connected by relationships (edges).
+
+## Vertexes
+
+Vertexes represent entities like processes, files, domains, devices, detections, and users.
+
+### Get vertex details
+
+```powershell Get-FalconThreatGraphVertex
+Get-FalconThreatGraphVertex -Id <string[]> [-VertexType <string>] [-Scope <string>] [-Nano <boolean>] [-IncludeEdge]
+```
+
+<ParamField path="Id" type="string[]" required>
+  Vertex identifier(s)
+</ParamField>
+
+<ParamField path="VertexType" type="string">
+  Vertex type (default: `any-vertex`). Options include:
+  - `process`, `processes` - Process execution
+  - `detection`, `detections` - Security detections
+  - `device`, `devices` - Endpoint devices
+  - `domain`, `domains` - DNS domains
+  - `ipv4`, `ipv6` - IP addresses
+  - `indicator`, `indicators` - Threat indicators
+  - `user`, `users` - User accounts
+  - `file`, `extracted-files` - Files
+  - `module`, `modules` - Loaded modules/libraries
+  - `command-lines` - Command line executions
+  - `incident`, `incidents` - Security incidents
+  - `hunting-leads` - Threat hunting leads
+  - And many more (see full list in source)
+</ParamField>
+
+<ParamField path="Scope" type="string">
+  Scope of the request. Options: `cspm`, `customer`, `cwpp`, `device`, `global`
+</ParamField>
+
+<ParamField path="Nano" type="boolean">
+  Return nano-precision entity timestamps
+</ParamField>
+
+<ParamField path="IncludeEdge" type="switch">
+  Include a brief list of connected edges
+</ParamField>
+
+**Example: Get process details with connected edges**
+
+```powershell
+Get-FalconThreatGraphVertex -Id "ind:abc123:1234567890" -VertexType process -IncludeEdge
+```
+
+## Edges
+
+Edges represent relationships between vertexes, such as "process spawned process" or "process connected to domain".
+
+### List available edge types
+
+```powershell
+Get-FalconThreatGraphEdge
+```
+
+**Example output**: Edge types like `spawned_process`, `read_file`, `wrote_file`, `dns_request`, `network_connection`
+
+### Get edges for a vertex
+
+```powershell Get-FalconThreatGraphEdge
+Get-FalconThreatGraphEdge -Id <string> -EdgeType <string> [-Scope <string>] [-Direction <string>] [-Nano <boolean>] [-Limit <int32>] [-Offset <string>] [-All] [-Total]
+```
+
+<ParamField path="Id" type="string" required>
+  Vertex identifier
+</ParamField>
+
+<ParamField path="EdgeType" type="string" required>
+  Edge type to retrieve (e.g., `spawned_process`, `dns_request`, `network_connection`)
+</ParamField>
+
+<ParamField path="Scope" type="string">
+  Scope of the request. Options: `cspm`, `customer`, `cwpp`, `device`, `global`
+</ParamField>
+
+<ParamField path="Direction" type="string">
+  Edge direction to filter results
+</ParamField>
+
+<ParamField path="Nano" type="boolean">
+  Return nano-precision entity timestamps
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-100, default: 100)
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Example: Get all child processes**
+
+```powershell
+Get-FalconThreatGraphEdge -Id "ind:abc123:1234567890" -EdgeType spawned_process -All
+```
+
+## Indicator Searches
+
+### Search for hosts with an indicator
+
+```powershell Get-FalconThreatGraphIndicator
+Get-FalconThreatGraphIndicator -Type <string> -Value <string> [-Nano <boolean>] [-Limit <int32>] [-Offset <string>] [-All] [-Total]
+```
+
+<ParamField path="Type" type="string" required>
+  Indicator type. Options: `domain`, `ipv4`, `ipv6`, `md5`, `sha1`, `sha256`
+</ParamField>
+
+<ParamField path="Value" type="string" required>
+  Indicator value (e.g., domain name, IP address, file hash)
+</ParamField>
+
+<ParamField path="Nano" type="boolean">
+  Return nano-precision entity timestamps
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-100, default: 100)
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Example: Find hosts that contacted a domain**
+
+```powershell
+Get-FalconThreatGraphIndicator -Type domain -Value "malicious-domain.com" -All
+```
+
+**Example: Find hosts with a file hash**
+
+```powershell
+Get-FalconThreatGraphIndicator -Type sha256 -Value "abc123def456..." -All
+```
+
+**Example: Find hosts that connected to an IP**
+
+```powershell
+Get-FalconThreatGraphIndicator -Type ipv4 -Value "192.168.1.100" -All
+```
+
+## Common Workflows
+
+### Investigate a detection
+
+```powershell
+# Get detection vertex
+$Detection = Get-FalconThreatGraphVertex -Id "ldt:abc123:1234567890" -VertexType detection -IncludeEdge
+
+# Get associated process
+$ProcessId = $Detection.edges | Where-Object { $_.edge_type -eq 'associated_process' } | Select-Object -ExpandProperty vertex_id
+$Process = Get-FalconThreatGraphVertex -Id $ProcessId -VertexType process -IncludeEdge
+
+# Get parent process
+$ParentEdges = Get-FalconThreatGraphEdge -Id $ProcessId -EdgeType spawned_by -All
+$ParentId = $ParentEdges.vertex_id
+$Parent = Get-FalconThreatGraphVertex -Id $ParentId -VertexType process
+```
+
+### Trace process execution chain
+
+```powershell
+# Starting from a suspicious process
+$ProcessId = "ind:abc123:1234567890"
+
+# Get child processes
+$Children = Get-FalconThreatGraphEdge -Id $ProcessId -EdgeType spawned_process -All
+
+foreach ($Child in $Children) {
+    $ChildDetails = Get-FalconThreatGraphVertex -Id $Child.vertex_id -VertexType process
+    Write-Host "Child process: $($ChildDetails.process_name) - $($ChildDetails.command_line)"
+}
+```
+
+### Analyze network connections
+
+```powershell
+# Get network connections from a process
+$ProcessId = "ind:abc123:1234567890"
+$Connections = Get-FalconThreatGraphEdge -Id $ProcessId -EdgeType network_connection -All
+
+foreach ($Conn in $Connections) {
+    $ConnDetails = Get-FalconThreatGraphVertex -Id $Conn.vertex_id -VertexType ipv4
+    Write-Host "Connected to: $($ConnDetails.ip_address):$($ConnDetails.port)"
+}
+```
+
+### Hunt for lateral movement
+
+```powershell
+# Find all hosts where a suspicious file hash was seen
+$Hosts = Get-FalconThreatGraphIndicator -Type sha256 -Value "suspicious-hash-here" -All
+
+foreach ($Host in $Hosts) {
+    Write-Host "Found on device: $($Host.device_id) at $($Host.timestamp)"
+    
+    # Get device details
+    $Device = Get-FalconThreatGraphVertex -Id $Host.device_id -VertexType device
+    Write-Host "  Hostname: $($Device.hostname)"
+    Write-Host "  Last seen: $($Device.last_seen)"
+}
+```
+
+### Investigate file operations
+
+```powershell
+# Get files written by a process
+$ProcessId = "ind:abc123:1234567890"
+$WrittenFiles = Get-FalconThreatGraphEdge -Id $ProcessId -EdgeType wrote_file -All
+
+foreach ($File in $WrittenFiles) {
+    $FileDetails = Get-FalconThreatGraphVertex -Id $File.vertex_id -VertexType extracted_file
+    Write-Host "Wrote file: $($FileDetails.file_path)"
+    Write-Host "  SHA256: $($FileDetails.sha256)"
+}
+```
+
+### Map attack timeline
+
+```powershell
+# Start with an incident
+$IncidentId = "inc:abc123:1234567890"
+$Incident = Get-FalconThreatGraphVertex -Id $IncidentId -VertexType incident -IncludeEdge
+
+# Get all associated detections
+$DetectionEdges = $Incident.edges | Where-Object { $_.edge_type -eq 'associated_detection' }
+
+$Timeline = foreach ($Edge in $DetectionEdges) {
+    $Detection = Get-FalconThreatGraphVertex -Id $Edge.vertex_id -VertexType detection
+    [PSCustomObject]@{
+        Timestamp = $Detection.timestamp
+        Severity = $Detection.severity
+        Tactic = $Detection.tactic
+        Technique = $Detection.technique
+        Description = $Detection.description
+    }
+}
+
+$Timeline | Sort-Object Timestamp | Format-Table
+```
+
+## Understanding Vertex Types
+
+### Common Vertex Types
+
+| Type | Description |
+|------|-------------|
+| `process` | Executing processes |
+| `detection` | Security detections and alerts |
+| `device` | Endpoint devices/hosts |
+| `domain` | DNS domains |
+| `ipv4`, `ipv6` | IP addresses |
+| `indicator` | Threat indicators (IoCs) |
+| `user` | User accounts and sessions |
+| `extracted_file` | Files extracted for analysis |
+| `module` | Loaded DLLs/libraries |
+| `command_line` | Command line executions |
+| `incident` | Security incidents |
+| `hunting_lead` | Threat hunting leads |
+
+### Common Edge Types
+
+| Edge Type | Description |
+|-----------|-------------|
+| `spawned_process` | Parent-child process relationship |
+| `spawned_by` | Reverse of spawned_process |
+| `dns_request` | DNS query made by process |
+| `network_connection` | Network connection established |
+| `wrote_file` | File written by process |
+| `read_file` | File read by process |
+| `loaded_module` | DLL/library loaded by process |
+| `associated_detection` | Detection linked to entity |
+| `associated_process` | Process linked to detection |
+
+<Note>
+Requires **Threatgraph: Read** permission.
+</Note>
+
+<Tip>
+Use nano-precision timestamps when you need exact correlation between events occurring in rapid succession.
+</Tip>

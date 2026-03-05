@@ -1,0 +1,658 @@
+---
+title: Reporting Automation
+description: Automate report generation, scheduling, and data export
+icon: chart-line
+---
+
+Automate the creation, scheduling, and export of reports from Falcon data using PSFalcon.
+
+## Scheduled Reports
+
+### List Scheduled Reports
+
+```powershell
+# Get all scheduled reports
+$Reports = Get-FalconScheduledReport -Detailed -All
+
+# Filter by status
+$ActiveReports = Get-FalconScheduledReport -Filter "status:'enabled'" -Detailed -All
+
+# Get reports by type
+$VulnReports = Get-FalconScheduledReport -Filter "type:'vulnerability'" -Detailed -All
+
+# Display report details
+$Reports | Select-Object id, name, type, status, schedule | Format-Table -AutoSize
+```
+
+### Download Latest Report Results
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+# Get most recent successful report executions
+$Executions = Get-FalconScheduledReport -Filter "last_execution.status:'DONE'" -Detailed -All |
+  Select-Object -ExpandProperty last_execution | 
+  Where-Object { $_.status -eq 'DONE' -and $_.result_metadata }
+
+if ($Executions) {
+  foreach ($Execution in $Executions) {
+    # Download report file
+    $OutputPath = Join-Path (Get-Location).Path $Execution.result_metadata.report_file_name
+    
+    Receive-FalconScheduledReport -Id $Execution.id -Path $OutputPath
+    
+    if (Test-Path $OutputPath) {
+      Write-Host "Downloaded: $($Execution.result_metadata.report_file_name)"
+      Get-ChildItem $OutputPath | Select-Object FullName, Length, LastWriteTime
+    }
+  }
+} else {
+  Write-Host "No completed report executions found"
+}
+```
+
+### Execute Scheduled Report On-Demand
+
+```powershell
+# Get report by name/filter
+$Report = Get-FalconScheduledReport -Filter "name:*'Daily Detection Summary'*" -Detailed | 
+  Select-Object -First 1
+
+if ($Report) {
+  # Execute report immediately
+  Invoke-FalconScheduledReport -Id $Report.id
+  
+  Write-Host "Scheduled report execution requested: $($Report.name)"
+  Write-Host "Check execution status with: Get-FalconScheduledReport -Id $($Report.id) -Execution"
+}
+```
+
+## Custom Host Reports
+
+### Generate Host Inventory Report
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter()]
+  [string]$Filter,
+  
+  [Parameter()]
+  [switch]$IncludeLoginInfo
+)
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "host_inventory_$(Get-Date -Format FileDateTime).csv"
+
+Write-Host "Generating host inventory report..."
+
+# Get all hosts
+$Param = @{
+  Detailed = $true
+  All = $true
+}
+
+if ($Filter) {
+  $Param['Filter'] = $Filter
+}
+
+if ($IncludeLoginInfo) {
+  $Param['Login'] = $true
+}
+
+$Hosts = Get-FalconHost @Param
+
+if (!$Hosts) {
+  Write-Host "No hosts found"
+  return
+}
+
+Write-Host "Found $($Hosts.Count) hosts"
+
+# Get policy information for enrichment
+$Policies = @{
+  prevention = @(Get-FalconPreventionPolicy -Detailed -All | Select-Object id, name)
+  sensor_update = @(Get-FalconSensorUpdatePolicy -Detailed -All | Select-Object id, name)
+  response = @(Get-FalconResponsePolicy -Detailed -All | Select-Object id, name)
+}
+
+# Get host group information
+$HostGroups = @(Get-FalconHostGroup -Detailed -All | Select-Object id, name)
+
+# Build report
+$Report = @($Hosts).foreach{
+  $Host = $_
+  
+  # Get policy names
+  $PreventionPolicy = $Policies.prevention | Where-Object { 
+    $_.id -eq $Host.device_policies.prevention.policy_id 
+  } | Select-Object -ExpandProperty name
+  
+  $SensorUpdatePolicy = $Policies.sensor_update | Where-Object { 
+    $_.id -eq $Host.device_policies.sensor_update.policy_id 
+  } | Select-Object -ExpandProperty name
+  
+  $ResponsePolicy = $Policies.response | Where-Object { 
+    $_.id -eq $Host.device_policies.response.policy_id 
+  } | Select-Object -ExpandProperty name
+  
+  # Get host group names
+  $Groups = @($Host.groups).foreach{
+    $GroupId = $_
+    $HostGroups | Where-Object { $_.id -eq $GroupId } | Select-Object -ExpandProperty name
+  } | Where-Object { $_ }
+  
+  $Entry = [PSCustomObject]@{
+    hostname = $Host.hostname
+    device_id = $Host.device_id
+    platform = $Host.platform_name
+    os_version = $Host.os_version
+    os_build = $Host.os_build
+    agent_version = $Host.agent_version
+    first_seen = $Host.first_seen
+    last_seen = $Host.last_seen
+    status = $Host.status
+    groups = $Groups -join '; '
+    prevention_policy = $PreventionPolicy
+    sensor_update_policy = $SensorUpdatePolicy
+    response_policy = $ResponsePolicy
+    local_ip = $Host.local_ip
+    external_ip = $Host.external_ip
+    mac_address = $Host.mac_address
+    serial_number = $Host.serial_number
+    system_manufacturer = $Host.system_manufacturer
+    system_product_name = $Host.system_product_name
+  }
+  
+  # Add login info if requested
+  if ($IncludeLoginInfo -and $Host.recent_logins) {
+    $Entry | Add-Member -NotePropertyName 'last_login_user' -NotePropertyValue $Host.recent_logins[0].user_name
+    $Entry | Add-Member -NotePropertyName 'last_login_time' -NotePropertyValue $Host.recent_logins[0].login_time
+  }
+  
+  $Entry
+}
+
+# Export to CSV
+$Report | Export-Csv -Path $OutputFile -NoTypeInformation
+
+Write-Host "Report generated with $($Report.Count) hosts"
+Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+```
+
+### Generate Stale Host Report
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter()]
+  [int]$DaysOffline = 30
+)
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "stale_hosts_$(Get-Date -Format FileDateTime).csv"
+
+# Find hosts not seen in X days
+$Filter = "last_seen:<'now-$($DaysOffline)d'"
+$StaleHosts = Get-FalconHost -Filter $Filter -Detailed -All
+
+if (!$StaleHosts) {
+  Write-Host "No hosts found offline for $DaysOffline+ days"
+  return
+}
+
+Write-Host "Found $($StaleHosts.Count) stale hosts"
+
+# Calculate days offline
+$Report = @($StaleHosts).foreach{
+  $LastSeen = [datetime]$_.last_seen
+  $DaysOffline = [Math]::Floor((Get-Date) - $LastSeen).TotalDays
+  
+  [PSCustomObject]@{
+    hostname = $_.hostname
+    device_id = $_.device_id
+    platform = $_.platform_name
+    os_version = $_.os_version
+    agent_version = $_.agent_version
+    first_seen = $_.first_seen
+    last_seen = $_.last_seen
+    days_offline = $DaysOffline
+    status = $_.status
+  }
+}
+
+# Sort by days offline
+$Report = $Report | Sort-Object -Property days_offline -Descending
+
+# Export
+$Report | Export-Csv -Path $OutputFile -NoTypeInformation
+
+Write-Host "`nStale Host Summary:"
+Write-Host "  Total: $($Report.Count)"
+Write-Host "  30-60 days: $(($Report | Where-Object { $_.days_offline -ge 30 -and $_.days_offline -lt 60 }).Count)"
+Write-Host "  60-90 days: $(($Report | Where-Object { $_.days_offline -ge 60 -and $_.days_offline -lt 90 }).Count)"
+Write-Host "  90+ days: $(($Report | Where-Object { $_.days_offline -ge 90 }).Count)"
+
+Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+```
+
+## Detection Reports
+
+### Daily Detection Summary Report
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter()]
+  [int]$DaysBack = 1
+)
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "detection_summary_$(Get-Date -Format FileDateTime).csv"
+
+# Get detections from last X days
+$Filter = "first_behavior:>'now-$($DaysBack)d'"
+$Detections = Get-FalconDetection -Filter $Filter -Detailed -All
+
+if (!$Detections) {
+  Write-Host "No detections in the last $DaysBack day(s)"
+  return
+}
+
+Write-Host "Found $($Detections.Count) detections"
+
+# Build report
+$Report = @($Detections).foreach{
+  [PSCustomObject]@{
+    detection_id = $_.detection_id
+    hostname = $_.device.hostname
+    platform = $_.device.platform_name
+    severity = $_.max_severity_displayname
+    status = $_.status
+    first_behavior = $_.first_behavior
+    last_behavior = $_.last_behavior
+    assigned_to = $_.assigned_to_name
+    tactic = ($_.behaviors.tactic | Select-Object -Unique) -join '; '
+    technique = ($_.behaviors.technique | Select-Object -Unique) -join '; '
+    behavior_count = $_.behaviors.Count
+  }
+}
+
+# Export
+$Report | Export-Csv -Path $OutputFile -NoTypeInformation
+
+# Generate summary statistics
+$Summary = [PSCustomObject]@{
+  total_detections = $Detections.Count
+  critical = ($Detections | Where-Object { $_.max_severity_displayname -eq 'Critical' }).Count
+  high = ($Detections | Where-Object { $_.max_severity_displayname -eq 'High' }).Count
+  medium = ($Detections | Where-Object { $_.max_severity_displayname -eq 'Medium' }).Count
+  low = ($Detections | Where-Object { $_.max_severity_displayname -eq 'Low' }).Count
+  new_status = ($Detections | Where-Object { $_.status -eq 'new' }).Count
+  in_progress = ($Detections | Where-Object { $_.status -eq 'in_progress' }).Count
+  assigned = ($Detections | Where-Object { $_.assigned_to_name }).Count
+  unassigned = ($Detections | Where-Object { -not $_.assigned_to_name }).Count
+}
+
+Write-Host "`nDetection Summary (Last $DaysBack Day(s)):"
+$Summary | Format-List
+
+Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+```
+
+### Detection Metrics Over Time
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter()]
+  [int]$DaysBack = 30
+)
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "detection_metrics_$(Get-Date -Format FileDateTime).csv"
+
+Write-Host "Collecting detection metrics for last $DaysBack days..."
+
+$Metrics = @()
+
+# Collect metrics for each day
+for ($i = 0; $i -lt $DaysBack; $i++) {
+  $StartDay = $DaysBack - $i
+  $EndDay = $DaysBack - $i - 1
+  
+  $Filter = "first_behavior:>'now-$($StartDay)d'+first_behavior:<'now-$($EndDay)d'"
+  
+  # Get counts by severity
+  $Total = Get-FalconDetection -Filter $Filter -Total
+  $Critical = Get-FalconDetection -Filter "$Filter+max_severity_displayname:'Critical'" -Total
+  $High = Get-FalconDetection -Filter "$Filter+max_severity_displayname:'High'" -Total
+  $Medium = Get-FalconDetection -Filter "$Filter+max_severity_displayname:'Medium'" -Total
+  $Low = Get-FalconDetection -Filter "$Filter+max_severity_displayname:'Low'" -Total
+  
+  $Date = (Get-Date).AddDays(-$StartDay).ToString('yyyy-MM-dd')
+  
+  $Metrics += [PSCustomObject]@{
+    date = $Date
+    total = $Total
+    critical = $Critical
+    high = $High
+    medium = $Medium
+    low = $Low
+  }
+  
+  Write-Host "$Date: $Total detections"
+  
+  # Rate limiting
+  Start-Sleep -Milliseconds 500
+}
+
+# Export
+$Metrics | Export-Csv -Path $OutputFile -NoTypeInformation
+
+Write-Host "`nMetrics collected for $DaysBack days"
+Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+```
+
+## Vulnerability Reports
+
+### CVE by Host Report
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string[]]$Cve
+)
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "cve_by_host_$(Get-Date -Format FileDate).csv"
+
+Write-Host "Querying vulnerabilities for $($Cve.Count) CVE(s)..."
+
+# Process CVEs in batches of 20
+for ($i = 0; $i -lt $Cve.Count; $i += 20) {
+  $Group = @($Cve[$i..([Math]::Min($i + 19, $Cve.Count - 1))]).foreach{ "'$_'" } -join ','
+  
+  $Param = @{
+    Filter = "suppression_info.is_suppressed:False+status:!'closed'+cve.id:[$Group]"
+    Facet = 'host_info'
+    Detailed = $true
+    All = $true
+  }
+  
+  $Vulnerabilities = Get-FalconVulnerability @Param
+  
+  if ($Vulnerabilities) {
+    # Get unique AIDs for login lookup
+    $AidList = $Vulnerabilities.aid | Select-Object -Unique
+    $LoginList = Get-FalconHost -Id $AidList -Login
+    
+    # Build output
+    $Output = @($Vulnerabilities).foreach{
+      $Vuln = $_
+      $Login = @($LoginList).Where({ $_.device_id -eq $Vuln.aid }).recent_logins | Select-Object -First 1
+      
+      [PSCustomObject]@{
+        vulnerability_id = $Vuln.vulnerability_id
+        cve_id = $Vuln.cve.id
+        hostname = $Vuln.host_info.hostname
+        aid = $Vuln.aid
+        status = $Vuln.status
+        confidence = $Vuln.confidence
+        created_timestamp = $Vuln.created_timestamp
+        updated_timestamp = $Vuln.updated_timestamp
+        last_login_user = if ($Login) { $Login.user_name } else { '' }
+        last_login_time = if ($Login) { $Login.login_time } else { '' }
+      }
+    }
+    
+    # Export
+    $Output | Export-Csv -Path $OutputFile -NoTypeInformation -Append
+    
+    Write-Host "Batch $([Math]::Floor($i/20) + 1): Found $($Output.Count) vulnerabilities"
+  }
+  
+  # Rate limiting
+  Start-Sleep -Seconds 2
+}
+
+if (Test-Path $OutputFile) {
+  $Results = Import-Csv -Path $OutputFile
+  Write-Host "`nTotal vulnerabilities: $($Results.Count)"
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+## Automated Report Scheduling
+
+### Daily Report Generation Script
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+<#
+.SYNOPSIS
+Daily automated report generation for Falcon environment
+.DESCRIPTION
+Generates daily reports for hosts, detections, and vulnerabilities.
+Designed to run as a scheduled task.
+#>
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter()]
+  [string]$OutputDirectory = (Get-Location).Path,
+  
+  [Parameter()]
+  [string]$EmailTo,
+  
+  [Parameter()]
+  [string]$SmtpServer
+)
+
+# Authenticate
+try {
+  Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+  
+  if ((Test-FalconToken).Token -ne $true) {
+    throw "Authentication failed"
+  }
+} catch {
+  Write-Error "Failed to authenticate: $_"
+  exit 1
+}
+
+# Create date-stamped directory
+$DateStamp = Get-Date -Format 'yyyy-MM-dd'
+$ReportDir = Join-Path $OutputDirectory "falcon_reports_$DateStamp"
+
+if (!(Test-Path $ReportDir)) {
+  New-Item -Path $ReportDir -ItemType Directory | Out-Null
+}
+
+Write-Host "Generating reports in: $ReportDir"
+
+# Generate reports
+$Reports = @()
+
+try {
+  # 1. Host inventory
+  Write-Host "Generating host inventory..."
+  $HostFile = Join-Path $ReportDir 'host_inventory.csv'
+  $Hosts = Get-FalconHost -Detailed -All
+  $Hosts | Select-Object hostname, device_id, platform_name, os_version, agent_version, last_seen |
+    Export-Csv -Path $HostFile -NoTypeInformation
+  $Reports += "Host Inventory: $($Hosts.Count) hosts"
+  
+  # 2. Daily detections
+  Write-Host "Generating detection summary..."
+  $DetectionFile = Join-Path $ReportDir 'daily_detections.csv'
+  $Detections = Get-FalconDetection -Filter "first_behavior:>'now-24h'" -Detailed -All
+  if ($Detections) {
+    $Detections | Select-Object detection_id, @{l='hostname';e={$_.device.hostname}}, 
+      max_severity_displayname, status, first_behavior |
+      Export-Csv -Path $DetectionFile -NoTypeInformation
+    $Reports += "Daily Detections: $($Detections.Count) detections"
+  } else {
+    $Reports += "Daily Detections: 0 detections"
+  }
+  
+  # 3. Stale hosts
+  Write-Host "Generating stale host report..."
+  $StaleFile = Join-Path $ReportDir 'stale_hosts.csv'
+  $StaleHosts = Get-FalconHost -Filter "last_seen:<'now-30d'" -Detailed -All
+  if ($StaleHosts) {
+    $StaleHosts | Select-Object hostname, device_id, platform_name, last_seen |
+      Export-Csv -Path $StaleFile -NoTypeInformation
+    $Reports += "Stale Hosts (30+ days): $($StaleHosts.Count) hosts"
+  } else {
+    $Reports += "Stale Hosts: 0 hosts"
+  }
+  
+  # 4. Summary statistics
+  Write-Host "Generating summary..."
+  $SummaryFile = Join-Path $ReportDir 'summary.txt'
+  
+  $Summary = @"
+Falcon Daily Report - $DateStamp
+================================
+
+Host Statistics:
+  Total Hosts: $(Get-FalconHost -Total)
+  Online (24h): $(Get-FalconHost -Filter "last_seen:>'now-24h'" -Total)
+  Stale (30d+): $($StaleHosts.Count)
+
+Detection Statistics:
+  Total (24h): $(if ($Detections) { $Detections.Count } else { 0 })
+  Critical: $(Get-FalconDetection -Filter "first_behavior:>'now-24h'+max_severity_displayname:'Critical'" -Total)
+  New: $(Get-FalconDetection -Filter "status:'new'+first_behavior:>'now-24h'" -Total)
+  
+Reports Generated:
+$($Reports -join "`n")
+
+Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+"@
+  
+  $Summary | Out-File -FilePath $SummaryFile
+  
+  Write-Host "`n$Summary"
+  
+  # Send email if configured
+  if ($EmailTo -and $SmtpServer) {
+    Write-Host "Sending email report..."
+    
+    $EmailParams = @{
+      To = $EmailTo
+      From = 'falcon-reports@company.com'
+      Subject = "Falcon Daily Report - $DateStamp"
+      Body = $Summary
+      SmtpServer = $SmtpServer
+      Attachments = @($HostFile, $DetectionFile, $StaleFile, $SummaryFile)
+    }
+    
+    Send-MailMessage @EmailParams
+    Write-Host "Email sent to $EmailTo"
+  }
+  
+} catch {
+  Write-Error "Report generation failed: $_"
+  exit 1
+} finally {
+  # Always revoke token
+  if ((Test-FalconToken).Token -eq $true) {
+    Revoke-FalconToken
+  }
+}
+
+Write-Host "`nReport generation complete"
+Get-ChildItem $ReportDir | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
+```
+
+### Schedule as Windows Task
+
+```powershell
+# Create scheduled task to run daily reports
+$Action = New-ScheduledTaskAction -Execute 'PowerShell.exe' -Argument @"
+-NoProfile -ExecutionPolicy Bypass -File "C:\Scripts\DailyFalconReport.ps1" -ClientId "YOUR_CLIENT_ID" -ClientSecret "YOUR_CLIENT_SECRET" -OutputDirectory "C:\Reports" -EmailTo "security@company.com" -SmtpServer "smtp.company.com"
+"@
+
+$Trigger = New-ScheduledTaskTrigger -Daily -At 6:00AM
+
+$Principal = New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+
+$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
+
+Register-ScheduledTask -TaskName "Falcon Daily Report" -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description "Generate daily Falcon security reports"
+
+Write-Host "Scheduled task 'Falcon Daily Report' created"
+```
+
+<Note>
+  Store API credentials securely using Windows Credential Manager, Azure Key Vault, or encrypted files instead of hardcoding them in scripts.
+</Note>
+
+## Export Formats
+
+### Export to JSON
+
+```powershell
+# Export detections with full details to JSON
+$Detections = Get-FalconDetection -Filter "first_behavior:>'now-7d'" -Detailed -All
+$OutputFile = 'detections.json'
+
+$Detections | ConvertTo-Json -Depth 16 | Out-File -FilePath $OutputFile
+```
+
+### Export to Excel (using ImportExcel module)
+
+```powershell
+# Requires ImportExcel module: Install-Module ImportExcel
+$Hosts = Get-FalconHost -Detailed -All
+$Detections = Get-FalconDetection -Filter "first_behavior:>'now-7d'" -Detailed -All
+
+$ExcelFile = 'falcon_report.xlsx'
+
+# Export hosts to sheet 1
+$Hosts | Select-Object hostname, platform_name, os_version, agent_version, last_seen |
+  Export-Excel -Path $ExcelFile -WorksheetName 'Hosts' -AutoSize -FreezeTopRow
+
+# Export detections to sheet 2
+$Detections | Select-Object detection_id, @{l='hostname';e={$_.device.hostname}}, 
+  max_severity_displayname, status, first_behavior |
+  Export-Excel -Path $ExcelFile -WorksheetName 'Detections' -AutoSize -FreezeTopRow
+
+Write-Host "Excel report generated: $ExcelFile"
+```
+
+<Warning>
+  Large exports can consume significant memory. For datasets over 50,000 records, use streaming techniques or export in batches.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bulk Operations" icon="layer-group" href="/examples/bulk-operations">
+    Process large datasets efficiently
+  </Card>
+  <Card title="Detection Management" icon="shield-halved" href="/examples/detection-management">
+    Query and manage detections
+  </Card>
+</CardGroup>

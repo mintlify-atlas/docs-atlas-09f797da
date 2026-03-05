@@ -1,0 +1,216 @@
+---
+title: Alerts
+description: Search for and perform actions on alerts in CrowdStrike Falcon
+---
+
+## Get-FalconAlert
+
+Search for alerts in the CrowdStrike Falcon platform.
+
+**Required Permission:** `Alerts: Read`
+
+### Syntax
+
+```powershell
+# Search for alerts by filter
+Get-FalconAlert [-Filter <string>] [-Query <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+
+# Get detailed alert information
+Get-FalconAlert -Detailed -Filter <string> [-Sort <string>] [-Limit <int32>] [-After <string>] [-All] [-Total]
+
+# Retrieve specific alerts by ID
+Get-FalconAlert -Id <string[]> [-IncludeHidden <boolean>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Alert identifier(s). Can be provided via pipeline.
+  
+  **Aliases:** `composite_ids`, `composite_id`, `ids`
+</ParamField>
+
+<ParamField path="IncludeHidden" type="boolean">
+  Include hidden alerts when retrieving results by identifier.
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields.
+  
+  **Aliases:** `q`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request.
+  
+  **Range:** 1-10000 (maximum 1000 when using `-Detailed`)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results (used for pagination).
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results (used with `-Detailed`).
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for alerts.
+  
+  Required when using the combined endpoint.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Search for alerts
+# Get all alerts with a specific severity
+Get-FalconAlert -Filter "severity:'High'" -All
+
+# Search for alerts using a query string
+Get-FalconAlert -Query "malware" -Limit 100
+```
+
+```powershell Get detailed information
+# Retrieve detailed alert information
+Get-FalconAlert -Detailed -Filter "status:'new'" -Limit 50
+```
+
+```powershell Retrieve by ID
+# Get specific alerts by their IDs
+$AlertIds = @('ldt:abc123...', 'ldt:def456...')
+Get-FalconAlert -Id $AlertIds
+
+# Include hidden alerts
+Get-FalconAlert -Id $AlertIds -IncludeHidden $true
+```
+</CodeGroup>
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconAlert](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconAlert)
+
+---
+
+## Invoke-FalconAlertAction
+
+Perform actions on alerts in the CrowdStrike Falcon platform.
+
+**Required Permission:** `Alerts: Write`
+
+### Syntax
+
+```powershell
+# Perform a single action
+Invoke-FalconAlertAction -Name <string> [-Value <string>] [-IncludeHidden <boolean>] -Id <string[]>
+
+# Perform multiple actions
+Invoke-FalconAlertAction -Action <hashtable[]> [-IncludeHidden <boolean>] -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform on the alert(s).
+  
+  **Valid values:**
+  - `add_tag` - Add a tag to the alert
+  - `append_comment` - Add a comment to the alert
+  - `assign_to_name` - Assign alert to a user by name
+  - `assign_to_user_id` - Assign alert to a user by ID
+  - `assign_to_uuid` - Assign alert to a user by UUID
+  - `remove_tag` - Remove a specific tag from the alert
+  - `remove_tags_by_prefix` - Remove tags matching a prefix
+  - `show_in_ui` - Show/hide alert in UI
+  - `unassign` - Unassign the alert
+  - `update_status` - Update the alert status
+</ParamField>
+
+<ParamField path="Value" type="string">
+  Value for the chosen action (e.g., tag name, comment text, user ID, status value).
+</ParamField>
+
+<ParamField path="Action" type="hashtable[]">
+  One or more hashtables defining multiple name/value pairs for batch operations.
+  
+  **Aliases:** `action_parameters`
+  
+  Example: `@(@{name='add_tag'; value='investigated'}, @{name='update_status'; value='in_progress'})`
+</ParamField>
+
+<ParamField path="IncludeHidden" type="boolean">
+  Include hidden alerts when performing action.
+  
+  **Default:** `$true`
+  
+  **Aliases:** `include_hidden`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Alert identifier(s). Can be provided via pipeline.
+  
+  **Aliases:** `composite_ids`, `composite_id`, `ids`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Add tag to alerts
+# Add a tag to specific alerts
+Invoke-FalconAlertAction -Name add_tag -Value 'investigated' -Id $AlertIds
+```
+
+```powershell Update alert status
+# Update the status of alerts
+Invoke-FalconAlertAction -Name update_status -Value 'in_progress' -Id $AlertIds
+```
+
+```powershell Assign alerts
+# Assign alerts to a user
+Invoke-FalconAlertAction -Name assign_to_user_id -Value 'user@example.com' -Id $AlertIds
+```
+
+```powershell Multiple actions
+# Perform multiple actions on alerts
+$Actions = @(
+    @{name='add_tag'; value='reviewed'},
+    @{name='append_comment'; value='Investigated on 2026-03-05'},
+    @{name='update_status'; value='closed'}
+)
+Invoke-FalconAlertAction -Action $Actions -Id $AlertIds
+```
+
+```powershell Pipeline usage
+# Process alerts from pipeline
+Get-FalconAlert -Filter "status:'new'" | 
+    Invoke-FalconAlertAction -Name update_status -Value 'in_progress'
+```
+</CodeGroup>
+
+### Notes
+
+- Maximum of 1000 alert IDs can be processed per request
+- When using `-Action`, multiple operations can be performed in a single API call
+- The `-IncludeHidden` parameter defaults to `$true` when not specified
+
+### Related Links
+
+- [PSFalcon Wiki: Invoke-FalconAlertAction](https://github.com/crowdstrike/psfalcon/wiki/Invoke-FalconAlertAction)

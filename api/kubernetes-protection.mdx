@@ -1,0 +1,596 @@
+---
+title: Kubernetes Protection
+description: Manage Kubernetes cluster security and protection with CrowdStrike Falcon
+---
+
+## Overview
+
+Manage Kubernetes cluster registration, monitoring, and security for Falcon Container Security. These cmdlets enable you to connect cloud provider Kubernetes services (EKS, AKS), configure cluster protection, and deploy Falcon sensors to Kubernetes environments.
+
+## Prerequisites
+
+- **Kubernetes Protection: Read** - Required for retrieval operations
+- **Kubernetes Protection: Write** - Required for provisioning and modifications
+
+---
+
+## Cluster Management
+
+### Get-FalconContainerAccount
+
+Return provisioned Falcon Container Security accounts and known clusters.
+
+```powershell Get-FalconContainerAccount
+Get-FalconContainerAccount [-Id <string[]>] [-Location <string[]>] [-ClusterService <string[]>] [-ClusterStatus <string[]>] [-Limit <int>] [-Offset <int>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Cluster account identifier
+</ParamField>
+
+<ParamField path="Location" type="string[]">
+  Cloud provider location
+</ParamField>
+
+<ParamField path="ClusterService" type="string[]">
+  Cluster service. Valid values: `aks`, `eks`
+</ParamField>
+
+<ParamField path="ClusterStatus" type="string[]">
+  Cluster status. Valid values: `Not Installed`, `Running`, `Stopped`
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all cluster accounts
+Get-FalconContainerAccount -All
+
+# Get running EKS clusters
+Get-FalconContainerAccount -ClusterService eks -ClusterStatus Running
+
+# Get clusters by location
+Get-FalconContainerAccount -Location us-east-1 -All
+```
+
+---
+
+### Get-FalconContainerCloud
+
+Return Falcon Container Security cloud provider locations.
+
+```powershell Get-FalconContainerCloud
+Get-FalconContainerCloud [-Cloud <string[]>]
+```
+
+### Parameters
+
+<ParamField path="Cloud" type="string[]">
+  Cloud provider. Valid values: `aws`, `azure`, `gcp`
+</ParamField>
+
+### Example
+
+```powershell
+# Get all cloud locations
+Get-FalconContainerCloud
+
+# Get AWS locations
+Get-FalconContainerCloud -Cloud aws
+```
+
+---
+
+## AWS Account Management
+
+### Get-FalconContainerAwsAccount
+
+Return Falcon Container Security AWS accounts.
+
+```powershell Get-FalconContainerAwsAccount
+Get-FalconContainerAwsAccount [-Id <string[]>] [-Status <string>] [-IsFcsAcct <string>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="Status" type="string">
+  Filter by account status. Valid values: `provisioned`, `operational`
+</ParamField>
+
+<ParamField path="IsFcsAcct" type="string">
+  Restrict results to Falcon Cloud Security. Valid values: `false`, `true`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all AWS accounts
+Get-FalconContainerAwsAccount -All
+
+# Get operational accounts
+Get-FalconContainerAwsAccount -Status operational
+
+# Get specific account
+Get-FalconContainerAwsAccount -Id 123456789012
+```
+
+---
+
+### New-FalconContainerAwsAccount
+
+Provision Falcon Container Security AWS accounts.
+
+```powershell New-FalconContainerAwsAccount
+New-FalconContainerAwsAccount -Region <string> -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Region" type="string" required>
+  AWS cloud region
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  AWS account identifier (12-digit format)
+</ParamField>
+
+### Example
+
+```powershell
+# Provision AWS account
+New-FalconContainerAwsAccount -Region us-east-1 -Id 123456789012
+```
+
+---
+
+### Edit-FalconContainerAwsAccount
+
+Modify Falcon Container Security AWS accounts.
+
+```powershell Edit-FalconContainerAwsAccount
+Edit-FalconContainerAwsAccount -Id <string[]> [-Region <string>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="Region" type="string">
+  AWS cloud region
+</ParamField>
+
+### Example
+
+```powershell
+# Update account region
+Edit-FalconContainerAwsAccount -Id 123456789012 -Region us-west-2
+```
+
+---
+
+### Remove-FalconContainerAwsAccount
+
+Remove Falcon Container Security AWS accounts.
+
+```powershell Remove-FalconContainerAwsAccount
+Remove-FalconContainerAwsAccount -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  AWS account identifier (12-digit format)
+</ParamField>
+
+### Example
+
+```powershell
+# Remove AWS account
+Remove-FalconContainerAwsAccount -Id 123456789012
+```
+
+---
+
+## Azure Account Management
+
+### Get-FalconContainerAzureAccount
+
+Return Falcon Container Security Azure accounts.
+
+```powershell Get-FalconContainerAzureAccount
+Get-FalconContainerAzureAccount [-Id <string[]>] [-SubscriptionId <string[]>] [-Status <string>] [-IsFcsAcct <boolean>] [-Limit <int>] [-Offset <int>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="SubscriptionId" type="string[]">
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+<ParamField path="Status" type="string">
+  Filter by account status. Valid values: `operational`, `provisioned`
+</ParamField>
+
+<ParamField path="IsFcsAcct" type="boolean">
+  Restrict results to Falcon Cloud Security
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all Azure accounts
+Get-FalconContainerAzureAccount -All
+
+# Get by tenant
+Get-FalconContainerAzureAccount -Id 12345678-1234-1234-1234-123456789012
+
+# Get by subscription
+Get-FalconContainerAzureAccount -SubscriptionId 87654321-4321-4321-4321-210987654321
+```
+
+---
+
+### New-FalconContainerAzureAccount
+
+Provision Falcon Container Security Azure accounts.
+
+```powershell New-FalconContainerAzureAccount
+New-FalconContainerAzureAccount [-SubscriptionId <string>] [-TenantId <string>]
+```
+
+### Parameters
+
+<ParamField path="SubscriptionId" type="string">
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+<ParamField path="TenantId" type="string">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Provision Azure account
+New-FalconContainerAzureAccount -SubscriptionId 12345678-1234-1234-1234-123456789012 -TenantId 87654321-4321-4321-4321-210987654321
+```
+
+---
+
+### Edit-FalconContainerAzureAccount
+
+Modify the client identifier for a Falcon Container Security Azure account.
+
+```powershell Edit-FalconContainerAzureAccount
+Edit-FalconContainerAzureAccount -ClientId <string> -Id <string>
+```
+
+### Parameters
+
+<ParamField path="ClientId" type="string" required>
+  Azure client identifier (GUID format)
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Update client ID
+Edit-FalconContainerAzureAccount -ClientId 11111111-1111-1111-1111-111111111111 -Id 22222222-2222-2222-2222-222222222222
+```
+
+---
+
+### Remove-FalconContainerAzureAccount
+
+Remove Falcon Container Security Azure accounts.
+
+```powershell Remove-FalconContainerAzureAccount
+Remove-FalconContainerAzureAccount -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Remove Azure account
+Remove-FalconContainerAzureAccount -Id 12345678-1234-1234-1234-123456789012
+```
+
+---
+
+### Get-FalconContainerAzureConfig
+
+Return Falcon Container Security Azure tenant configurations.
+
+```powershell Get-FalconContainerAzureConfig
+Get-FalconContainerAzureConfig [-Id <string[]>] [-Limit <int>] [-Offset <int>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all Azure configurations
+Get-FalconContainerAzureConfig -All
+
+# Get specific tenant config
+Get-FalconContainerAzureConfig -Id 12345678-1234-1234-1234-123456789012
+```
+
+---
+
+### Get-FalconContainerAzureTenant
+
+Return Falcon Container Security Azure tenants.
+
+```powershell Get-FalconContainerAzureTenant
+Get-FalconContainerAzureTenant [-Id <string[]>] [-Status <string>] [-Limit <int>] [-Offset <int>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="Status" type="string">
+  Cluster status. Valid values: `Not Installed`, `Running`, `Stopped`
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all tenants
+Get-FalconContainerAzureTenant -All
+
+# Get running tenants
+Get-FalconContainerAzureTenant -Status Running
+```
+
+---
+
+## Deployment & Configuration
+
+### Get-FalconContainerScript
+
+Return bash scripts for Falcon Cloud Security registration.
+
+```powershell Get-FalconContainerScript
+Get-FalconContainerScript
+```
+
+### Example
+
+```powershell
+# Get registration scripts
+Get-FalconContainerScript
+```
+
+---
+
+### Get-FalconContainerAzureScript
+
+Return Falcon Container Security script for Azure.
+
+```powershell Get-FalconContainerAzureScript
+Get-FalconContainerAzureScript -Id <string> [-SubscriptionId <string[]>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="SubscriptionId" type="string[]">
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Get Azure script
+Get-FalconContainerAzureScript -Id 12345678-1234-1234-1234-123456789012
+
+# Get for specific subscription
+Get-FalconContainerAzureScript -Id 12345678-1234-1234-1234-123456789012 -SubscriptionId 87654321-4321-4321-4321-210987654321
+```
+
+---
+
+### Receive-FalconContainerYaml
+
+Download a sample Helm values.yaml file.
+
+```powershell Receive-FalconContainerYaml
+Receive-FalconContainerYaml -ClusterName <string> -Path <string> [-IsSelfManagedCluster <boolean>] [-Force]
+```
+
+### Parameters
+
+<ParamField path="ClusterName" type="string" required>
+  Cluster name
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Destination path for the YAML file
+</ParamField>
+
+<ParamField path="IsSelfManagedCluster" type="boolean">
+  Restrict results to clusters that are not managed by the cloud provider
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite existing file when present
+</ParamField>
+
+### Example
+
+```powershell
+# Download Helm values
+Receive-FalconContainerYaml -ClusterName my-eks-cluster -Path ./values.yaml
+
+# Download for self-managed cluster
+Receive-FalconContainerYaml -ClusterName my-k8s-cluster -Path ./values.yaml -IsSelfManagedCluster $true
+```
+
+---
+
+### New-FalconContainerKey
+
+Regenerate the API key for Falcon Container Security Docker registry integrations.
+
+```powershell New-FalconContainerKey
+New-FalconContainerKey
+```
+
+### Example
+
+```powershell
+# Regenerate API key
+New-FalconContainerKey
+```
+
+---
+
+### Invoke-FalconContainerScan
+
+Initiate a Falcon Container Security scan.
+
+```powershell Invoke-FalconContainerScan
+Invoke-FalconContainerScan -ScanType <string>
+```
+
+### Parameters
+
+<ParamField path="ScanType" type="string" required>
+  Scan type. Valid values: `cluster-refresh`, `dry-run`, `full`
+</ParamField>
+
+### Example
+
+```powershell
+# Run full scan
+Invoke-FalconContainerScan -ScanType full
+
+# Run dry run
+Invoke-FalconContainerScan -ScanType dry-run
+
+# Refresh cluster data
+Invoke-FalconContainerScan -ScanType cluster-refresh
+```
+
+---
+
+## Related Resources
+
+- [Container Security](/api/container-security)
+- [Cloud Security - AWS](/api/cloud-aws)
+- [Cloud Security - Azure](/api/cloud-azure)
+- [Cloud Security - GCP](/api/cloud-gcp)

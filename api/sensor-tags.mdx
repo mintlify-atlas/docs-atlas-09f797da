@@ -1,0 +1,381 @@
+---
+title: Sensor Tags
+description: Manage SensorGroupingTags using Real-time Response
+---
+
+<Note>
+SensorGroupingTags are locally stored tags on the Falcon sensor that persist across sensor reinstalls and are synchronized with the cloud. These cmdlets use Real-time Response to manage tags via scripts executed on the host.
+
+For cloud-managed FalconGroupingTags, see [Devices](/api/devices#add-falcongroupingtag).
+</Note>
+
+## Get-FalconSensorTag
+
+Display SensorGroupingTags assigned to hosts.
+
+```powershell
+Get-FalconSensorTag -Id <String[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to retrieve sensor tags from
+  
+  **Aliases:** `ids`, `device_id`, `host_ids`, `aid`
+</ParamField>
+
+**Required Permission:** `Hosts: Read`
+
+### Examples
+
+<CodeGroup>
+```powershell Get Tags
+# Get sensor tags for a single host
+Get-FalconSensorTag -Id "abc123def456..."
+
+# Get sensor tags for multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Get-FalconSensorTag -Id $HostIds
+```
+
+```powershell Pipeline Usage
+# Get sensor tags from search results
+Get-FalconHost -Filter "platform_name:'Windows'" | Get-FalconSensorTag
+```
+</CodeGroup>
+
+### Output
+
+Returns objects with the following properties:
+
+- `cid` - Customer ID
+- `device_id` - Host identifier
+- `tags` - Comma-separated list of SensorGroupingTags (without the `SensorGroupingTags/` prefix)
+
+---
+
+## Add-FalconSensorTag
+
+Add SensorGroupingTags to hosts using Real-time Response.
+
+```powershell
+Add-FalconSensorTag -Tag <String[]> [-QueueOffline <Boolean>] -Id <String[]>
+```
+
+<ParamField path="Tag" type="string[]" required>
+  SensorGroupingTag value(s) to add
+  
+  Tags will be appended to any existing tags. Use `Set-FalconSensorTag` to overwrite existing tags.
+  
+  **Valid characters:** Letters, numbers, hyphens, underscores, forward slashes  
+  **Note:** The `SensorGroupingTags/` prefix is automatically handled
+  
+  **Aliases:** `Tags`
+</ParamField>
+
+<ParamField path="QueueOffline" type="boolean">
+  Add command request to the offline queue if the host is not online
+  
+  **Default:** `$false`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to add tags to
+  
+  **Aliases:** `ids`, `device_id`, `host_ids`, `aid`
+</ParamField>
+
+**Required Permissions:** `Hosts: Read`, `Sensor update policies: Write`, `Real time response: Read`, `Real time response (admin): Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Add Tags
+# Add a single tag to a host
+Add-FalconSensorTag -Tag "Production" -Id "abc123def456..."
+
+# Add multiple tags to a host
+Add-FalconSensorTag -Tag "Production","WebServer" -Id "abc123def456..."
+
+# Add tags to multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Add-FalconSensorTag -Tag "Database" -Id $HostIds
+```
+
+```powershell Queue Offline
+# Add tag and queue for offline hosts
+Add-FalconSensorTag -Tag "Critical" -QueueOffline $true -Id "abc123def456..."
+```
+
+```powershell Pipeline Usage
+# Add tags to hosts from search results
+Get-FalconHost -Filter "platform_name:'Linux'" | Add-FalconSensorTag -Tag "LinuxServers"
+
+# Add tags to hosts in a group
+Get-FalconHostGroupMember -Id "group123..." | Add-FalconSensorTag -Tag "GroupMember"
+```
+</CodeGroup>
+
+### Return Values
+
+Returns an object with the following properties:
+
+- `cid` - Customer ID
+- `device_id` - Host identifier
+- `tags` - Updated comma-separated list of tags
+- `offline_queued` - Boolean indicating if command was queued
+- `session_id` - RTR session identifier
+- `cloud_request_id` - Request identifier
+- `status` - Operation status (`TAG_ADDED`, `TAG_NOT_ADDED`, `PENDING_QUEUE`, `HOST_OFFLINE_AND_NOT_QUEUED`, etc.)
+
+<Note>
+This cmdlet uses Real-time Response to execute scripts on the host. The operation requires an active RTR session or the ability to queue commands for offline hosts.
+</Note>
+
+---
+
+## Remove-FalconSensorTag
+
+Remove SensorGroupingTags from hosts using Real-time Response.
+
+```powershell
+Remove-FalconSensorTag [[-Tag] <String[]>] [-QueueOffline <Boolean>] -Id <String[]>
+```
+
+<ParamField path="Tag" type="string[]">
+  SensorGroupingTag value(s) to remove
+  
+  When provided, only specified tags are removed and others remain. If no tags are provided, **all existing tags will be removed**.
+  
+  **Valid characters:** Letters, numbers, hyphens, underscores, forward slashes  
+  **Note:** The `SensorGroupingTags/` prefix is automatically handled
+  
+  **Aliases:** `Tags`
+</ParamField>
+
+<ParamField path="QueueOffline" type="boolean">
+  Add command request to the offline queue if the host is not online
+  
+  **Default:** `$false`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to remove tags from
+  
+  **Aliases:** `ids`, `device_id`, `host_ids`, `aid`
+</ParamField>
+
+**Required Permissions:** `Hosts: Read`, `Sensor update policies: Write`, `Real time response: Read`, `Real time response (admin): Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Remove Specific Tags
+# Remove a single tag from a host
+Remove-FalconSensorTag -Tag "Production" -Id "abc123def456..."
+
+# Remove multiple tags from a host
+Remove-FalconSensorTag -Tag "Production","WebServer" -Id "abc123def456..."
+
+# Remove tags from multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Remove-FalconSensorTag -Tag "Decommissioned" -Id $HostIds
+```
+
+```powershell Remove All Tags
+# Remove all tags from a host
+Remove-FalconSensorTag -Id "abc123def456..."
+
+# Remove all tags from multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Remove-FalconSensorTag -Id $HostIds
+```
+
+```powershell Queue Offline
+# Remove tag and queue for offline hosts
+Remove-FalconSensorTag -Tag "Temporary" -QueueOffline $true -Id "abc123def456..."
+```
+
+```powershell Pipeline Usage
+# Remove tags from hosts in a group
+Get-FalconHostGroupMember -Id "group123..." | Remove-FalconSensorTag -Tag "Testing"
+```
+</CodeGroup>
+
+### Return Values
+
+Returns an object with the following properties:
+
+- `cid` - Customer ID
+- `device_id` - Host identifier
+- `tags` - Updated comma-separated list of remaining tags
+- `offline_queued` - Boolean indicating if command was queued
+- `session_id` - RTR session identifier
+- `cloud_request_id` - Request identifier
+- `status` - Operation status (`TAG_REMOVED`, `TAG_NOT_REMOVED`, `NO_TAG_SET`, `TAG_NOT_PRESENT`, etc.)
+
+<Warning>
+Calling `Remove-FalconSensorTag` without specifying any tags will remove **all** SensorGroupingTags from the host.
+</Warning>
+
+---
+
+## Set-FalconSensorTag
+
+Set SensorGroupingTags on hosts using Real-time Response (overwrites existing tags).
+
+```powershell
+Set-FalconSensorTag -Tag <String[]> [-QueueOffline <Boolean>] -Id <String[]>
+```
+
+<ParamField path="Tag" type="string[]" required>
+  SensorGroupingTag value(s) to set
+  
+  Provided tags will **overwrite** any existing tags. To append to existing tags, use `Add-FalconSensorTag`.
+  
+  **Valid characters:** Letters, numbers, hyphens, underscores, forward slashes  
+  **Note:** The `SensorGroupingTags/` prefix is automatically handled
+  
+  **Aliases:** `Tags`
+</ParamField>
+
+<ParamField path="QueueOffline" type="boolean">
+  Add command request to the offline queue if the host is not online
+  
+  **Default:** `$false`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to set tags on
+  
+  **Aliases:** `ids`, `device_id`, `host_ids`, `aid`
+</ParamField>
+
+**Required Permissions:** `Hosts: Read`, `Sensor update policies: Write`, `Real time response: Read`, `Real time response (admin): Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Set Tags
+# Set a single tag (removes any existing tags)
+Set-FalconSensorTag -Tag "Production" -Id "abc123def456..."
+
+# Set multiple tags
+Set-FalconSensorTag -Tag "Production","WebServer","Critical" -Id "abc123def456..."
+
+# Set tags on multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Set-FalconSensorTag -Tag "Database" -Id $HostIds
+```
+
+```powershell Queue Offline
+# Set tags and queue for offline hosts
+Set-FalconSensorTag -Tag "NewEnvironment" -QueueOffline $true -Id "abc123def456..."
+```
+
+```powershell Pipeline Usage
+# Set tags for hosts from search results
+Get-FalconHost -Filter "platform_name:'Windows'+last_seen:>'2024-01-01'" | Set-FalconSensorTag -Tag "ActiveWindows"
+```
+</CodeGroup>
+
+### Return Values
+
+Returns an object with the following properties:
+
+- `cid` - Customer ID
+- `device_id` - Host identifier
+- `tags` - New comma-separated list of tags
+- `offline_queued` - Boolean indicating if command was queued
+- `session_id` - RTR session identifier
+- `cloud_request_id` - Request identifier
+- `status` - Operation status (`TAG_SET`, `TAG_NOT_SET`, `PENDING_QUEUE`, `HOST_OFFLINE_AND_NOT_QUEUED`, etc.)
+
+<Warning>
+`Set-FalconSensorTag` **overwrites** all existing tags on the host. Use `Add-FalconSensorTag` to preserve existing tags.
+</Warning>
+
+---
+
+## Uninstall-FalconSensor
+
+Uninstall the Falcon sensor from a host using Real-time Response.
+
+```powershell
+Uninstall-FalconSensor [-QueueOffline <Boolean>] [-Include <String[]>] -Id <String>
+```
+
+<ParamField path="QueueOffline" type="boolean">
+  Add command request to the offline queue if the host is not online
+  
+  **Default:** `$false`
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional host properties in the response
+  
+  **Valid values:** `agent_version`, `cid`, `external_ip`, `first_seen`, `hostname`, `last_seen`, `local_ip`, `mac_address`, `os_build`, `os_version`, `platform_name`, `product_type`, `product_type_desc`, `serial_number`, `system_manufacturer`, `system_product_name`, `tags`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Host identifier to uninstall sensor from (single host per request)
+  
+  **Aliases:** `HostId`, `device_id`, `host_ids`, `aid`
+</ParamField>
+
+**Required Permissions:** `Hosts: Read`, `Sensor update policies: Write`, `Real time response: Read`, `Real time response (admin): Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Basic Uninstall
+# Uninstall sensor from a host
+Uninstall-FalconSensor -Id "abc123def456..."
+
+# Uninstall and include additional properties
+Uninstall-FalconSensor -Id "abc123def456..." -Include hostname,os_version,tags
+```
+
+```powershell Queue Offline
+# Queue uninstall for offline host
+Uninstall-FalconSensor -QueueOffline $true -Id "abc123def456..."
+```
+
+```powershell Pipeline Usage
+# Uninstall from specific host
+Get-FalconHost -Filter "hostname:'decommissioned-server'" | Uninstall-FalconSensor
+```
+</CodeGroup>
+
+### Return Values
+
+Returns an object with the following properties:
+
+- `cid` - Customer ID
+- `device_id` - Host identifier
+- `status` - Uninstall status message
+- Additional properties based on `Include` parameter
+
+<Warning>
+This operation **permanently uninstalls** the Falcon sensor from the host. The sensor will stop protecting the endpoint and reporting to the console. Only Windows and Linux hosts are currently supported.
+</Warning>
+
+<Note>
+The uninstall operation automatically retrieves the maintenance token if uninstall protection is enabled. For hosts in maintenance mode, the operation uses the maintenance token. The operation is executed via Real-time Response scripts specific to the host's operating system.
+</Note>
+
+## Tag Type Comparison
+
+PSFalcon supports two types of host tags:
+
+| Feature | FalconGroupingTags | SensorGroupingTags |
+|---------|-------------------|-------------------|
+| **Management** | Cloud API-based | Real-time Response scripts |
+| **Storage** | Cloud-based | Local on sensor |
+| **Cmdlets** | `Add-FalconGroupingTag`<br/>`Remove-FalconGroupingTag` | `Add-FalconSensorTag`<br/>`Remove-FalconSensorTag`<br/>`Set-FalconSensorTag`<br/>`Get-FalconSensorTag` |
+| **Permissions** | `Hosts: Write` | `Hosts: Read`<br/>`Sensor update policies: Write`<br/>`RTR: Read`<br/>`RTR (Admin): Write` |
+| **Use Cases** | Quick tagging<br/>Cloud-managed | Persistent tagging<br/>Survives reinstalls |
+| **Requirements** | API access | Active RTR session or offline queue |
+
+<Tip>
+Use **FalconGroupingTags** for quick, cloud-managed tagging. Use **SensorGroupingTags** when you need tags to persist locally on the sensor and survive reinstalls.
+</Tip>

@@ -1,0 +1,412 @@
+---
+title: Host Groups
+description: Manage host groups and memberships
+---
+
+## Get-FalconHostGroup
+
+Search for host groups in your environment.
+
+```powershell
+Get-FalconHostGroup [[-Filter] <String>] [[-Sort] <String>] [[-Limit] <Int32>] [[-Include] <String[]>] [[-Offset] <Int32>] [-Detailed] [-All] [-Total]
+Get-FalconHostGroup -Id <String[]> [-Include <String[]>]
+```
+
+<ParamField path="Id" type="string[]">
+  Host group identifier(s) to retrieve specific groups
+  
+  **Aliases:** `ids`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  **Example:** `name:'*Production*'+group_type:'static'`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  **Valid values:** `created_by.asc`, `created_by.desc`, `created_timestamp.asc`, `created_timestamp.desc`, `group_type.asc`, `group_type.desc`, `modified_by.asc`, `modified_by.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties in the response
+  
+  **Valid values:** `members` - Include member host IDs
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results (for pagination)
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for host groups
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Required Permission:** `Host groups: Read`
+
+### Examples
+
+<CodeGroup>
+```powershell Basic Search
+# Get all host groups
+Get-FalconHostGroup -All
+
+# Get detailed information for all groups
+Get-FalconHostGroup -Detailed -All
+
+# Get groups with member information
+Get-FalconHostGroup -Include members -All
+```
+
+```powershell Specific Groups
+# Get a specific host group by ID
+Get-FalconHostGroup -Id "group123abc..."
+
+# Get multiple groups by ID
+Get-FalconHostGroup -Id "group123abc...","group456def..."
+```
+
+```powershell Filtered Search
+# Find static host groups
+Get-FalconHostGroup -Filter "group_type:'static'" -Detailed -All
+
+# Find groups by name pattern
+Get-FalconHostGroup -Filter "name:'*Production*'" -All
+
+# Sort groups by modification date
+Get-FalconHostGroup -Sort modified_timestamp.desc -All
+```
+</CodeGroup>
+
+---
+
+## New-FalconHostGroup
+
+Create new host groups.
+
+```powershell
+New-FalconHostGroup -GroupType <String> -Name <String> [-Description <String>] [-AssignmentRule <String>]
+New-FalconHostGroup -InputObject <Object[]>
+```
+
+<ParamField path="GroupType" type="string" required>
+  Type of host group to create
+  
+  **Valid values:**
+  - `static` - Manually managed membership
+  - `staticByID` - Manually managed by device ID
+  - `dynamic` - Automatically managed via FQL assignment rule
+  
+  **Aliases:** `group_type`
+</ParamField>
+
+<ParamField path="Name" type="string" required>
+  Host group name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Host group description
+</ParamField>
+
+<ParamField path="AssignmentRule" type="string">
+  FQL-based assignment rule (required for dynamic groups, not applicable for static groups)
+  
+  **Example:** `platform_name:'Windows'+tags:'FalconGroupingTags/Production'`
+  
+  **Aliases:** `assignment_rule`
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more host group objects to create in a single request (up to 10 per request)
+  
+  **Aliases:** `resources`, `Array`
+</ParamField>
+
+**Required Permission:** `Host groups: Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Static Groups
+# Create a static host group
+New-FalconHostGroup -GroupType static -Name "Production Servers" -Description "Production environment servers"
+
+# Create a static group with ID-based membership
+New-FalconHostGroup -GroupType staticByID -Name "Critical Assets" -Description "Business critical systems"
+```
+
+```powershell Dynamic Groups
+# Create a dynamic group with assignment rule
+New-FalconHostGroup -GroupType dynamic -Name "Windows Production" -Description "All Windows production hosts" -AssignmentRule "platform_name:'Windows'+tags:'FalconGroupingTags/Production'"
+
+# Create a dynamic group for Linux servers
+New-FalconHostGroup -GroupType dynamic -Name "Linux Servers" -AssignmentRule "platform_name:'Linux'"
+```
+
+```powershell Bulk Creation
+# Create multiple groups at once
+$Groups = @(
+    @{
+        group_type = 'static'
+        name = 'Web Servers'
+        description = 'Production web servers'
+    },
+    @{
+        group_type = 'static'
+        name = 'Database Servers'
+        description = 'Production database servers'
+    }
+)
+New-FalconHostGroup -InputObject $Groups
+```
+</CodeGroup>
+
+<Note>
+Dynamic host groups automatically update membership based on the assignment rule. Static groups require manual membership management using `Invoke-FalconHostGroupAction`.
+</Note>
+
+---
+
+## Edit-FalconHostGroup
+
+Modify existing host groups.
+
+```powershell
+Edit-FalconHostGroup [[-Name] <String>] [[-Description] <String>] [[-AssignmentRule] <String>] -Id <String>
+```
+
+<ParamField path="Name" type="string">
+  New host group name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  New host group description
+</ParamField>
+
+<ParamField path="AssignmentRule" type="string">
+  New FQL-based assignment rule (only applicable for dynamic host groups)
+  
+  **Aliases:** `assignment_rule`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Host group identifier to modify
+</ParamField>
+
+**Required Permission:** `Host groups: Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Update Properties
+# Update group name
+Edit-FalconHostGroup -Id "group123abc..." -Name "Production Web Servers"
+
+# Update description
+Edit-FalconHostGroup -Id "group123abc..." -Description "Updated description"
+
+# Update multiple properties
+Edit-FalconHostGroup -Id "group123abc..." -Name "New Name" -Description "New description"
+```
+
+```powershell Update Assignment Rule
+# Update assignment rule for dynamic group
+Edit-FalconHostGroup -Id "group123abc..." -AssignmentRule "platform_name:'Windows'+tags:'FalconGroupingTags/Production'+tags:'FalconGroupingTags/WebServer'"
+```
+
+```powershell Pipeline Usage
+# Update group from pipeline
+Get-FalconHostGroup -Filter "name:'Old Name'" | Edit-FalconHostGroup -Name "New Name"
+```
+</CodeGroup>
+
+---
+
+## Remove-FalconHostGroup
+
+Remove host groups.
+
+```powershell
+Remove-FalconHostGroup -Id <String[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Host group identifier(s) to remove
+  
+  **Aliases:** `ids`
+</ParamField>
+
+**Required Permission:** `Host groups: Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Remove Groups
+# Remove a single host group
+Remove-FalconHostGroup -Id "group123abc..."
+
+# Remove multiple host groups
+Remove-FalconHostGroup -Id "group123abc...","group456def..."
+```
+
+```powershell Pipeline Usage
+# Remove groups matching a filter
+Get-FalconHostGroup -Filter "name:'*Test*'" | Remove-FalconHostGroup
+```
+</CodeGroup>
+
+<Warning>
+Removing a host group is permanent and cannot be undone. Ensure you have the correct group ID before executing.
+</Warning>
+
+---
+
+## Get-FalconHostGroupMember
+
+Search for members of a host group.
+
+```powershell
+Get-FalconHostGroupMember [[-Id] <String>] [[-Filter] <String>] [[-Sort] <String>] [[-Limit] <Int32>] [[-Offset] <Int32>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Id" type="string">
+  Host group identifier to retrieve members from
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit member results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed member information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Required Permission:** `Host groups: Read`
+
+### Examples
+
+<CodeGroup>
+```powershell Basic Queries
+# Get all members of a host group
+Get-FalconHostGroupMember -Id "group123abc..." -All
+
+# Get detailed member information
+Get-FalconHostGroupMember -Id "group123abc..." -Detailed -All
+
+# Get member count
+Get-FalconHostGroupMember -Id "group123abc..." -Total
+```
+
+```powershell Filtered Queries
+# Get members with filter
+Get-FalconHostGroupMember -Id "group123abc..." -Filter "platform_name:'Windows'" -All
+
+# Get sorted members
+Get-FalconHostGroupMember -Id "group123abc..." -Sort "hostname.asc" -All
+```
+
+```powershell Pipeline Usage
+# Get members from pipeline
+Get-FalconHostGroup -Filter "name:'Production'" | Get-FalconHostGroupMember -All
+```
+</CodeGroup>
+
+---
+
+## Invoke-FalconHostGroupAction
+
+Add or remove hosts from host groups.
+
+```powershell
+Invoke-FalconHostGroupAction -Name <String> -Id <String> -HostId <String[]>
+```
+
+<ParamField path="Name" type="string" required>
+  Action to perform
+  
+  **Valid values:**
+  - `add-hosts` - Add hosts to the group
+  - `remove-hosts` - Remove hosts from the group
+  
+  **Aliases:** `action_name`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Host group identifier to modify
+</ParamField>
+
+<ParamField path="HostId" type="string[]" required>
+  Host identifier(s) to add or remove (processed in batches of 500)
+  
+  **Aliases:** `ids`, `device_id`, `HostIds`
+</ParamField>
+
+**Required Permission:** `Host groups: Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Add Hosts
+# Add a single host to a group
+Invoke-FalconHostGroupAction -Name add-hosts -Id "group123abc..." -HostId "host123def..."
+
+# Add multiple hosts to a group
+$HostIds = @("host123def...","host456ghi...")
+Invoke-FalconHostGroupAction -Name add-hosts -Id "group123abc..." -HostId $HostIds
+```
+
+```powershell Remove Hosts
+# Remove a host from a group
+Invoke-FalconHostGroupAction -Name remove-hosts -Id "group123abc..." -HostId "host123def..."
+
+# Remove multiple hosts from a group
+$HostIds = @("host123def...","host456ghi...")
+Invoke-FalconHostGroupAction -Name remove-hosts -Id "group123abc..." -HostId $HostIds
+```
+
+```powershell Pipeline Usage
+# Add hosts from search results to a group
+Get-FalconHost -Filter "platform_name:'Linux'" | Invoke-FalconHostGroupAction -Name add-hosts -Id "group123abc..."
+
+# Remove hosts from a group
+Get-FalconHostGroupMember -Id "group123abc..." -Filter "last_seen:<'2024-01-01'" | Invoke-FalconHostGroupAction -Name remove-hosts -Id "group123abc..."
+```
+</CodeGroup>
+
+<Note>
+Host membership actions are processed in batches of 500. For large operations, the cmdlet automatically handles batching.
+</Note>

@@ -1,0 +1,501 @@
+---
+title: "Falcon Sandbox"
+description: "Submit files and URLs for dynamic malware analysis using Falcon Intelligence Sandbox"
+---
+
+Analyze suspicious files and URLs in isolated environments to understand malware behavior, identify threats, and generate detailed forensic reports.
+
+## Cmdlets
+
+### Get-FalconReport
+
+Search for Falcon Intelligence Sandbox reports.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Report identifier (format: `<sha256>_<environment_id>`)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Summary" type="switch">
+  Return a summary version
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Get all sandbox reports from the last 7 days
+Get-FalconReport -Filter "created_timestamp:>'now-7d'" -Detailed
+
+# Get a specific report
+Get-FalconReport -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_160'
+
+# Get report summaries
+Get-FalconReport -Filter "verdict:'malicious'" -Summary
+```
+
+---
+
+### Get-FalconSubmission
+
+Search for Falcon Intelligence Sandbox submissions.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Submission identifier (format: `<sha256>_<environment_id>`)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Get all submissions from the last 24 hours
+Get-FalconSubmission -Filter "created_timestamp:>'now-24h'" -Detailed
+
+# Get a specific submission
+Get-FalconSubmission -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_160'
+
+# Get count of pending submissions
+Get-FalconSubmission -Filter "state:'running'" -Total
+```
+
+---
+
+### Get-FalconSubmissionQuota
+
+Retrieve monthly Falcon Intelligence Sandbox submission quota.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Read`
+
+```powershell Example
+# Check your monthly sandbox submission quota
+Get-FalconSubmissionQuota
+```
+
+---
+
+### New-FalconSubmission
+
+Submit a sample to the Falcon Intelligence Sandbox.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Write`
+
+<Note>
+  SHA256 values are retrieved from files uploaded using `Send-FalconSample`. Files must be uploaded before they can be submitted to the sandbox.
+</Note>
+
+<ParamField path="EnvironmentId" type="string">
+  Analysis environment. Valid values:
+  - `android`
+  - `macOS_10.15`
+  - `ubuntu16_x64`, `ubuntu20_x64`
+  - `win7_x64`, `win7_x86`
+  - `win10_x64`, `win11_x64`
+</ParamField>
+
+<ParamField path="AutoDetect" type="boolean">
+  Auto detect environment
+</ParamField>
+
+<ParamField path="Url" type="string">
+  A webpage or file URL
+</ParamField>
+
+<ParamField path="ActionScript" type="string">
+  Runtime script for sandbox analysis. Valid values:
+  - `default`
+  - `default_maxantievasion`
+  - `default_randomfiles`
+  - `default_randomtheme`
+  - `default_openie`
+</ParamField>
+
+<ParamField path="Browser" type="string">
+  Browser to use with URL submission
+</ParamField>
+
+<ParamField path="Interactivity" type="boolean">
+  Whether sandbox detonation is interactive
+</ParamField>
+
+<ParamField path="CommandLine" type="string">
+  Command line script passed to the submitted file at runtime
+</ParamField>
+
+<ParamField path="SystemDate" type="string">
+  A custom date to use in the analysis environment (format: YYYY-MM-DD)
+</ParamField>
+
+<ParamField path="SystemTime" type="string">
+  A custom time to use in the analysis environment (format: HH:MM)
+</ParamField>
+
+<ParamField path="DocumentPassword" type="string">
+  Auto-filled for Adobe or Office files that prompt for a password
+</ParamField>
+
+<ParamField path="NetworkSetting" type="string">
+  Network settings to use in the analysis environment. Valid values: `default`, `offline`, `simulated`, `tor`
+</ParamField>
+
+<ParamField path="EnableTor" type="boolean">
+  Route traffic via TOR
+</ParamField>
+
+<ParamField path="UserTag" type="string[]">
+  Tags to categorize the submission
+</ParamField>
+
+<ParamField path="SendEmail" type="boolean">
+  Send email notification
+</ParamField>
+
+<ParamField path="SubmitName" type="string">
+  Submission name
+</ParamField>
+
+<ParamField path="Aid" type="string">
+  Agent identifier
+</ParamField>
+
+<ParamField path="Sha256" type="string">
+  SHA256 hash value
+</ParamField>
+
+```powershell Example
+# Submit a file for analysis on Windows 10
+Send-FalconSample -Path './suspicious.exe'
+New-FalconSubmission -Sha256 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -EnvironmentId win10_x64 -SubmitName 'suspicious.exe'
+
+# Submit a URL for analysis
+New-FalconSubmission -Url 'https://suspicious-site.com' -EnvironmentId win10_x64 -Browser 'chrome' -NetworkSetting 'default'
+
+# Submit with custom command line and tags
+New-FalconSubmission -Sha256 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -EnvironmentId win10_x64 -CommandLine '/install /silent' -UserTag 'campaign-2024','ransomware' -SendEmail $true
+
+# Submit Office document with password
+New-FalconSubmission -Sha256 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' -EnvironmentId win10_x64 -DocumentPassword 'infected'
+
+# Auto-detect environment with TOR routing
+New-FalconSubmission -Sha256 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -AutoDetect $true -EnableTor $true -NetworkSetting 'tor'
+
+# Submit with custom system date/time
+New-FalconSubmission -Sha256 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -EnvironmentId win11_x64 -SystemDate '2024-01-15' -SystemTime '14:30'
+```
+
+---
+
+### Receive-FalconArtifact
+
+Download an artifact from a Falcon Intelligence Sandbox report.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Read`
+
+<Note>
+  Artifact identifier values can be retrieved for specific Falcon Intelligence Sandbox reports using `Get-FalconReport`.
+</Note>
+
+<ParamField path="Path" type="string" required>
+  Destination path
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Artifact identifier (64-character hex)
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download a sandbox artifact
+Receive-FalconArtifact -Id 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' -Path './artifact.bin'
+```
+
+---
+
+### Receive-FalconMemoryDump
+
+Download a memory dump or extracted strings from a Falcon Intelligence Sandbox report.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Read`
+
+<ParamField path="Path" type="string">
+  Destination path (must end with .gzip)
+</ParamField>
+
+<ParamField path="BinaryId" type="string">
+  Binary content dump identifier (64-character hex)
+</ParamField>
+
+<ParamField path="ExtractId" type="string">
+  Extracted string identifier (64-character hex)
+</ParamField>
+
+<ParamField path="HexId" type="string">
+  Hex dump identifier (64-character hex)
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download binary memory dump
+Receive-FalconMemoryDump -BinaryId 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' -Path './memory.bin.gzip'
+
+# Download extracted strings
+Receive-FalconMemoryDump -ExtractId 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' -Path './strings.txt.gzip'
+
+# Download hex dump
+Receive-FalconMemoryDump -HexId 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2' -Path './hexdump.gzip'
+```
+
+---
+
+### Remove-FalconReport
+
+Remove a Falcon Intelligence Sandbox report.
+
+**Permissions**: `Sandbox (Falcon Intelligence): Write`
+
+<ParamField path="Id" type="string" required>
+  Report identifier
+</ParamField>
+
+```powershell Example
+# Delete a sandbox report
+Remove-FalconReport -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_160'
+```
+
+## Sandbox Analysis Workflow
+
+<Steps>
+  <Step title="Check Quota">
+    Use `Get-FalconSubmissionQuota` to verify available monthly submissions.
+  </Step>
+  
+  <Step title="Upload Sample">
+    Use `Send-FalconSample` to upload the file and obtain its SHA256 hash.
+  </Step>
+  
+  <Step title="Submit for Analysis">
+    Use `New-FalconSubmission` with the SHA256 hash and desired analysis environment.
+  </Step>
+  
+  <Step title="Monitor Submission">
+    Use `Get-FalconSubmission` to check the status of your submission.
+  </Step>
+  
+  <Step title="Retrieve Report">
+    Once complete, use `Get-FalconReport` to access the detailed analysis results.
+  </Step>
+  
+  <Step title="Download Artifacts">
+    Use `Receive-FalconArtifact` or `Receive-FalconMemoryDump` to download forensic evidence.
+  </Step>
+</Steps>
+
+## Analysis Environments
+
+<AccordionGroup>
+  <Accordion title="Windows Environments">
+    - **win11_x64**: Windows 11 64-bit (ID: 140)
+    - **win10_x64**: Windows 10 64-bit (ID: 160)
+    - **win7_x64**: Windows 7 64-bit (ID: 110)
+    - **win7_x86**: Windows 7 32-bit (ID: 100)
+    
+    Use for analyzing Windows executables, Office documents, and Windows-specific malware.
+  </Accordion>
+  
+  <Accordion title="macOS Environments">
+    - **macOS_10.15**: macOS Catalina (ID: 400)
+    
+    Use for analyzing macOS applications, DMG files, and macOS-specific threats.
+  </Accordion>
+  
+  <Accordion title="Linux Environments">
+    - **ubuntu20_x64**: Ubuntu 20.04 64-bit (ID: 310)
+    - **ubuntu16_x64**: Ubuntu 16.04 64-bit (ID: 300)
+    
+    Use for analyzing Linux binaries, shell scripts, and Linux-specific malware.
+  </Accordion>
+  
+  <Accordion title="Mobile Environments">
+    - **android**: Android environment (ID: 200)
+    
+    Use for analyzing Android APK files and mobile malware.
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Submission Options
+
+<CardGroup cols={2}>
+  <Card title="Action Scripts" icon="file-code">
+    Control sandbox behavior:
+    - `default`: Standard execution
+    - `default_maxantievasion`: Maximum anti-evasion techniques
+    - `default_randomfiles`: Randomized file environment
+    - `default_randomtheme`: Randomized visual theme
+    - `default_openie`: Use Internet Explorer
+  </Card>
+  
+  <Card title="Network Settings" icon="network-wired">
+    Control network access:
+    - `default`: Full internet access
+    - `offline`: No network connectivity
+    - `simulated`: Simulated network responses
+    - `tor`: Route traffic through TOR
+  </Card>
+</CardGroup>
+
+## URL vs File Submissions
+
+<CodeGroup>
+
+```powershell URL Submission
+# Submit a suspicious URL for analysis
+New-FalconSubmission `
+    -Url 'https://suspicious-phishing-site.com' `
+    -EnvironmentId win10_x64 `
+    -Browser 'chrome' `
+    -NetworkSetting 'default' `
+    -UserTag 'phishing','investigation-2024' `
+    -SendEmail $true
+```
+
+```powershell File Submission
+# Upload and submit a suspicious executable
+$Upload = Send-FalconSample -Path './malware.exe'
+
+New-FalconSubmission `
+    -Sha256 $Upload.sha256 `
+    -EnvironmentId win10_x64 `
+    -SubmitName 'malware.exe' `
+    -CommandLine '/install /silent' `
+    -ActionScript 'default_maxantievasion' `
+    -UserTag 'ransomware','campaign-xyz'
+```
+
+</CodeGroup>
+
+## Analyzing Results
+
+```powershell Complete Analysis Workflow
+# 1. Check quota
+$Quota = Get-FalconSubmissionQuota
+Write-Host "Remaining submissions: $($Quota.monthly.remaining)"
+
+# 2. Upload sample
+$Upload = Send-FalconSample -Path './suspicious.exe'
+
+# 3. Submit for analysis
+$Submission = New-FalconSubmission `
+    -Sha256 $Upload.sha256 `
+    -EnvironmentId win10_x64 `
+    -SubmitName 'suspicious.exe' `
+    -UserTag 'investigation-2024'
+
+# 4. Wait for completion
+do {
+    Start-Sleep -Seconds 30
+    $Status = Get-FalconSubmission -Id $Submission.id
+} while ($Status.state -eq 'running')
+
+# 5. Get detailed report
+$Report = Get-FalconReport -Id $Submission.id -Detailed
+
+# 6. Display verdict
+Write-Host "Verdict: $($Report.verdict)"
+Write-Host "Threat Level: $($Report.threat_score)"
+
+# 7. Download artifacts if malicious
+if ($Report.verdict -eq 'malicious') {
+    foreach ($Artifact in $Report.artifacts) {
+        Receive-FalconArtifact -Id $Artifact.id -Path "./artifacts/$($Artifact.name)"
+    }
+}
+```
+
+## Best Practices
+
+<Warning>
+  Do not submit files or URLs containing sensitive or confidential information. Sandbox environments are isolated but samples may be shared with CrowdStrike for analysis.
+</Warning>
+
+<Tip>
+  Use tags to organize submissions by investigation, campaign, or threat type. This makes it easier to search and correlate results later.
+</Tip>
+
+<Tip>
+  Enable email notifications for long-running analyses so you're notified when results are ready.
+</Tip>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Sample Uploads" icon="upload" href="/api/sample-uploads">
+    Upload samples to CrowdStrike
+  </Card>
+  <Card title="MalQuery" icon="magnifying-glass-chart" href="/api/malquery">
+    Hunt for similar malware samples
+  </Card>
+  <Card title="IOC Management" icon="crosshairs" href="/api/iocs">
+    Create IOCs from analysis results
+  </Card>
+  <Card title="Falcon Intelligence" icon="brain" href="/api/intel">
+    Access threat intelligence reports
+  </Card>
+</CardGroup>

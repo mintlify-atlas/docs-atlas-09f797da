@@ -1,0 +1,363 @@
+---
+title: Firewall Policies
+description: Manage Falcon Firewall Management policies to control network traffic and firewall rules
+---
+
+## Overview
+
+Firewall Management policies control network traffic on endpoints through the Falcon platform. These policies work in conjunction with firewall rules to define allowed and blocked network connections across your environment.
+
+<Info>
+**Required API Scope:** `Firewall management: Read` (for read operations) or `Firewall management: Write` (for write operations)
+</Info>
+
+## Get Firewall Policies
+
+Search for and retrieve Falcon Firewall Management policies.
+
+```powershell Get-FalconFirewallPolicy
+Get-FalconFirewallPolicy [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Include] <string[]>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Policy identifier(s). Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  Example: `platform_name:'Windows'+enabled:true`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Valid values: `created_by.asc`, `created_by.desc`, `created_timestamp.asc`, `created_timestamp.desc`, `enabled.asc`, `enabled.desc`, `modified_by.asc`, `modified_by.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`, `platform_name.asc`, `platform_name.desc`, `precedence.asc`, `precedence.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties
+  
+  Valid values: `members`, `settings`
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get all policies
+Get-FalconFirewallPolicy -All -Detailed
+```
+
+```powershell Get policy with settings
+Get-FalconFirewallPolicy -Id <policy_id> -Include settings
+```
+
+```powershell Filter enabled Windows policies
+Get-FalconFirewallPolicy -Filter "platform_name:'Windows'+enabled:true" -Detailed
+```
+</CodeGroup>
+
+## Create Firewall Policy
+
+Create new Falcon Firewall Management policies.
+
+```powershell New-FalconFirewallPolicy
+New-FalconFirewallPolicy -Name <string> -PlatformName <string> [[-Description] <string>]
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to create in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Create Windows firewall policy
+New-FalconFirewallPolicy -Name 'Production Servers Firewall' -PlatformName 'Windows' -Description 'Firewall policy for production Windows servers'
+```
+
+```powershell Create Linux firewall policy
+New-FalconFirewallPolicy -Name 'Linux DMZ Policy' -PlatformName 'Linux' -Description 'Restrictive firewall for DMZ Linux hosts'
+```
+</CodeGroup>
+
+<Note>
+After creating a firewall policy, you must assign firewall rule groups to it using policy actions and create/configure the actual firewall rules separately.
+</Note>
+
+## Edit Firewall Policy
+
+Modify existing Falcon Firewall Management policies.
+
+```powershell Edit-FalconFirewallPolicy
+Edit-FalconFirewallPolicy -Id <string> [[-Name] <string>] [[-Description] <string>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Policy name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to modify in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Update policy name
+Edit-FalconFirewallPolicy -Id <policy_id> -Name 'Updated Firewall Policy Name'
+```
+
+```powershell Update description
+Edit-FalconFirewallPolicy -Id <policy_id> -Description 'Updated firewall policy description'
+```
+</CodeGroup>
+
+## Remove Firewall Policy
+
+Remove Falcon Firewall Management policies.
+
+```powershell Remove-FalconFirewallPolicy
+Remove-FalconFirewallPolicy -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifier(s) to remove. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Example
+
+```powershell
+Remove-FalconFirewallPolicy -Id <policy_id>
+```
+
+## Policy Actions
+
+Perform actions on Falcon Firewall Management policies such as enabling/disabling or assigning to host groups.
+
+```powershell Invoke-FalconFirewallPolicyAction
+Invoke-FalconFirewallPolicyAction -Name <string> [[-GroupId] <string>] -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform
+  
+  Valid values: `add-host-group`, `disable`, `enable`, `remove-host-group`
+</ParamField>
+
+<ParamField path="GroupId" type="string">
+  Host group identifier. Pattern: `^[a-fA-F0-9]{32}$`
+  
+  Required for: `add-host-group`, `remove-host-group`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Enable policy
+Invoke-FalconFirewallPolicyAction -Name enable -Id <policy_id>
+```
+
+```powershell Assign to host group
+Invoke-FalconFirewallPolicyAction -Name add-host-group -GroupId <group_id> -Id <policy_id>
+```
+
+```powershell Remove from host group
+Invoke-FalconFirewallPolicyAction -Name remove-host-group -GroupId <group_id> -Id <policy_id>
+```
+
+```powershell Disable policy
+Invoke-FalconFirewallPolicyAction -Name disable -Id <policy_id>
+```
+</CodeGroup>
+
+## Get Policy Members
+
+Search for members (hosts) assigned to Falcon Firewall Management policies.
+
+```powershell Get-FalconFirewallPolicyMember
+Get-FalconFirewallPolicyMember [[-Id] <string>] [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string">
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+Get-FalconFirewallPolicyMember -Id <policy_id> -Detailed -All
+```
+
+## Set Policy Precedence
+
+Set Falcon Firewall Management policy precedence order for a specific platform.
+
+```powershell Set-FalconFirewallPrecedence
+Set-FalconFirewallPrecedence -PlatformName <string> -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifiers in desired precedence order (highest to lowest priority). Pattern: `^[a-fA-F0-9]{32}$`
+  
+  <Note>All policy identifiers must be supplied in order, with the exception of the `platform_default` policy.</Note>
+</ParamField>
+
+### Example
+
+```powershell
+$PolicyOrder = @('<policy_id_1>', '<policy_id_2>', '<policy_id_3>')
+Set-FalconFirewallPrecedence -PlatformName 'Windows' -Id $PolicyOrder
+```
+
+## Firewall Policy Architecture
+
+Firewall Management policies in Falcon work with several related components:
+
+1. **Firewall Policies**: Container for firewall configuration and rule assignments
+2. **Firewall Rule Groups**: Collections of firewall rules
+3. **Firewall Rules**: Individual rules defining network traffic permissions
+
+<Steps>
+  <Step title="Create Policy">
+    Create a firewall policy using `New-FalconFirewallPolicy`
+  </Step>
+  <Step title="Configure Rules">
+    Create and configure firewall rules using firewall rule management cmdlets
+  </Step>
+  <Step title="Assign to Hosts">
+    Assign the policy to host groups using `Invoke-FalconFirewallPolicyAction`
+  </Step>
+  <Step title="Enable Policy">
+    Enable the policy to enforce firewall rules on assigned hosts
+  </Step>
+</Steps>
+
+<Warning>
+Firewall policies can significantly impact network connectivity. Test policies in a non-production environment before deploying to production systems. Incorrect configurations may block legitimate traffic.
+</Warning>
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Segment Network Traffic">
+    Create firewall policies with different rule sets for workstations, servers, and specialized systems to implement network segmentation.
+  </Accordion>
+  
+  <Accordion title="Compliance Requirements">
+    Define firewall policies that meet compliance standards (PCI-DSS, HIPAA, etc.) and assign them to relevant host groups.
+  </Accordion>
+  
+  <Accordion title="Zero Trust Architecture">
+    Implement default-deny policies with explicit allow rules for authorized connections, supporting zero trust network principles.
+  </Accordion>
+  
+  <Accordion title="DMZ Protection">
+    Create restrictive firewall policies for DMZ hosts that allow only necessary inbound and outbound connections.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Prevention Policies" icon="shield-halved" href="/api/prevention-policies">
+    Manage Prevention policies
+  </Card>
+  <Card title="Device Control Policies" icon="usb" href="/api/device-control-policies">
+    Control USB and Bluetooth device usage
+  </Card>
+</CardGroup>

@@ -1,0 +1,370 @@
+---
+title: Host Operations
+description: Common host management operations including containment, host groups, and queries
+icon: server
+---
+
+Manage hosts, perform containment actions, create host groups, and query host information.
+
+## Query Hosts
+
+Retrieve host information using filters and sorting.
+
+```powershell
+# Get all hosts (paginated automatically)
+$Hosts = Get-FalconHost -Detailed -All
+
+# Get hosts with specific filter
+$WindowsHosts = Get-FalconHost -Filter "platform_name:'Windows'" -Detailed -All
+
+# Get recently seen hosts
+$RecentHosts = Get-FalconHost -Filter "last_seen:>'now-24h'" -Detailed -All
+
+# Sort by last seen (most recent first)
+$SortedHosts = Get-FalconHost -Sort last_seen.desc -Limit 100 -Detailed
+
+# Get total count only
+$TotalHosts = Get-FalconHost -Total
+Write-Host "Total hosts: $TotalHosts"
+```
+
+## Find Host by Hostname
+
+Locate a specific host and retrieve its details.
+
+```powershell
+# Find a single host by hostname (most recently seen)
+$Hostname = 'DESKTOP-ABC123'
+$Host = Get-FalconHost -Filter "hostname:['$Hostname']" -Sort last_seen.desc -Limit 1 -Detailed
+
+if ($Host) {
+  Write-Host "Found: $($Host.hostname) - $($Host.device_id)"
+  Write-Host "Platform: $($Host.platform_name)"
+  Write-Host "Last Seen: $($Host.last_seen)"
+  Write-Host "Agent Version: $($Host.agent_version)"
+} else {
+  Write-Error "No host found matching '$Hostname'"
+}
+```
+
+## Network Containment
+
+Isolate hosts from the network while maintaining connection to Falcon.
+
+### Contain Single Host by Hostname
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Hostname
+)
+
+# Get identifier for target system (most recently seen)
+$Target = Get-FalconHost -Filter "hostname:['$Hostname']" -Sort last_seen.desc -Limit 1
+
+if ($Target) {
+  # Contain the host
+  $Target | Invoke-FalconHostAction -Name contain
+  Write-Host "Containment requested for '$Hostname' ($Target)"
+} else {
+  throw "No identifier found for '$Hostname'."
+}
+```
+
+### Contain Multiple Hosts from CSV
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('\.csv$')]
+  [string]$Path
+)
+
+# Create output file
+$OutputFile = Join-Path (Get-Location).Path "contained_$(Get-Date -Format FileDateTime).csv"
+
+# Import CSV with 'hostname' column
+$Import = Import-Csv -Path $Path
+if (!$Import.hostname) { 
+  throw "No 'hostname' column found in '$Path'." 
+}
+
+# Search for hosts and capture most recently seen
+[System.Collections.Generic.List[object]]$HostList = @()
+@($Import.hostname).Where({![string]::IsNullOrEmpty($_)}).foreach{
+  @(Get-FalconHost -Filter "hostname:['$_']" -Limit 1 -Sort last_seen.desc -Detailed | 
+    Select-Object device_id, hostname).foreach{
+    $HostList.Add($_)
+  }
+}
+
+if (!$HostList.hostname) {
+  throw "No hosts found."
+} else {
+  # Contain devices
+  $HostList.device_id | Invoke-FalconHostAction -Name contain -OutVariable ContainList
+  
+  # Add status and export to CSV
+  @($HostList).foreach{
+    $Status = if ($ContainList.id -contains $_.device_id) { $true } else { $false }
+    $_.PSObject.Properties.Add((New-Object PSNoteProperty('contain_requested',$Status)))
+  }
+  
+  $HostList | Export-Csv -Path $OutputFile -NoTypeInformation
+  Get-ChildItem $OutputFile | Select-Object FullName,Length,LastWriteTime
+}
+```
+
+### Lift Containment
+
+```powershell
+# Release a contained host
+$Hostname = 'DESKTOP-ABC123'
+$Target = Get-FalconHost -Filter "hostname:['$Hostname']" -Sort last_seen.desc -Limit 1
+
+if ($Target) {
+  $Target | Invoke-FalconHostAction -Name lift_containment
+  Write-Host "Containment lifted for '$Hostname'"
+}
+```
+
+## Host Groups
+
+Organize hosts into static or dynamic groups.
+
+### Create Static Host Group
+
+```powershell
+# Create a static host group
+$Param = @{
+  GroupType = 'static'
+  Name = 'Critical Servers'
+  Description = 'Production database and web servers'
+}
+$Group = New-FalconHostGroup @Param
+
+if ($Group) {
+  Write-Host "Created group: $($Group.name) - $($Group.id)"
+}
+```
+
+### Create Dynamic Host Group
+
+```powershell
+# Create a dynamic host group based on filter
+$Param = @{
+  GroupType = 'dynamic'
+  Name = 'Windows Servers'
+  Description = 'All Windows Server systems'
+  AssignmentRule = "platform_name:'Windows'+product_type_desc:'Server'"
+}
+$Group = New-FalconHostGroup @Param
+```
+
+### Add Hosts to Group from File
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('\.txt$')]
+  [ValidateScript({
+    if (Test-Path -Path $_ -PathType Leaf) {
+      $true
+    } else {
+      throw "Cannot find path '$_' because it does not exist or is a directory."
+    }
+  })]
+  [string]$Path,
+  
+  [Parameter(Mandatory)]
+  [string]$Name,
+  
+  [string]$Description
+)
+
+# Create host group
+$Param = @{ 
+  GroupType = 'static'
+  Name = $Name 
+}
+if ($Description) { $Param['Description'] = $Description }
+
+$Group = New-FalconHostGroup @Param
+if (!$Group) { 
+  throw "Failed to create host group. Check permissions." 
+}
+
+# Find hosts and add them to the group
+$HostList = Find-FalconHostname -Path $Path
+
+if ($HostList) {
+  $HostList | Invoke-FalconHostGroupAction -Name add-hosts -Id $Group.id
+  Write-Host "Added $($HostList.Count) hosts to group '$Name'"
+} else {
+  throw "No hosts found."
+}
+```
+
+### Remove Hosts from Group
+
+```powershell
+# Get group by name
+$GroupName = 'Critical Servers'
+$Group = Get-FalconHostGroup -Filter "name:'$($GroupName.ToLower())'"
+
+# Remove specific hosts
+$HostIds = @('abc123...', 'def456...')
+$HostIds | Invoke-FalconHostGroupAction -Name remove-hosts -Id $Group
+```
+
+## Hide Hosts
+
+Remove stale or duplicate hosts from the console.
+
+### Hide Hosts by Last Seen Date
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidateRange(1,44)]
+  [int]$Days
+)
+
+# Hide hosts last seen more than X days ago
+$Filter = "last_seen:<'now-$($Days)d'"
+$HostList = Get-FalconHost -Filter $Filter -All
+
+if ($HostList) {
+  $HostList | Invoke-FalconHostAction -Name hide_host
+  Write-Host "Hidden $($HostList.Count) hosts not seen in $Days days"
+} else {
+  Write-Host "No hosts found using filter `"$Filter`"."
+}
+```
+
+### Find and Hide Duplicate Hosts
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+# Create output file
+$OutputFile = Join-Path (Get-Location).Path "duplicates_$(Get-Date -Format FileDateTime).csv"
+
+# Find duplicate hosts and hide them
+$Duplicate = Find-FalconDuplicate
+
+if ($Duplicate) {
+  $Duplicate | Invoke-FalconHostAction -Name hide_host
+  $Duplicate | Export-Csv -Path $OutputFile -NoTypeInformation
+  
+  Write-Host "Hidden $($Duplicate.Count) duplicate hosts"
+  Get-ChildItem $OutputFile | Select-Object FullName,Length,LastWriteTime
+}
+```
+
+<Warning>
+  Hidden hosts continue to communicate with Falcon and can be restored from the trash using `Invoke-FalconHostAction -Name unhide_host`. Review duplicate detection carefully before hiding hosts.
+</Warning>
+
+## Host Information Reports
+
+### Get Hosts with Last Login Information
+
+```powershell
+# Get hosts with their most recent login
+$Hosts = Get-FalconHost -Detailed -All | Select-Object hostname, device_id, platform_name, last_seen, @{
+  label = 'last_login_user'
+  expression = {
+    if ($_.recent_logins) {
+      $_.recent_logins[0].user_name
+    }
+  }
+}, @{
+  label = 'last_login_time'
+  expression = {
+    if ($_.recent_logins) {
+      $_.recent_logins[0].login_time
+    }
+  }
+}
+
+# Export to CSV
+$Hosts | Export-Csv -Path 'host_logins.csv' -NoTypeInformation
+```
+
+### Custom Host Report with Policy Information
+
+```powershell
+# Gather policy details for enrichment
+$Info = @{
+  groups = @(Get-FalconHostGroup -Detailed -All | Select-Object id,name)
+  prevention = @(Get-FalconPreventionPolicy -Detailed -All | Select-Object id,name)
+  sensor_update = @(Get-FalconSensorUpdatePolicy -Detailed -All | Select-Object id,name)
+}
+
+# Custom select for output
+$Select = @(
+  @{label='Host Name';expression={$_.hostname}},
+  @{label='Platform';expression={$_.platform_name}},
+  @{label='OS Version';expression={$_.os_version}},
+  @{label='Agent Version';expression={$_.agent_version}},
+  @{label='Last Seen';expression={$_.last_seen}},
+  @{label='Groups';expression={
+    (@($_.groups).foreach{
+      $Info.groups | Where-Object id -eq $_ | Select-Object -ExpandProperty name
+    }) -join ', '
+  }},
+  @{label='Prevention Policy';expression={
+    $Info.prevention | Where-Object id -eq $_.device_policies.prevention.policy_id |
+      Select-Object -ExpandProperty name
+  }}
+)
+
+# Get hosts and export
+Get-FalconHost -Detailed -All | Select-Object $Select | Export-Csv -Path 'host_report.csv' -NoTypeInformation
+```
+
+## Conditional Containment
+
+Contain hosts based on specific criteria.
+
+```powershell
+# Contain hosts running outdated agent versions
+$MinVersion = '7.00.0'
+$Hosts = Get-FalconHost -Detailed -All | Where-Object {
+  [version]$_.agent_version -lt [version]$MinVersion
+}
+
+if ($Hosts) {
+  Write-Host "Found $($Hosts.Count) hosts with agent version < $MinVersion"
+  $Hosts.device_id | Invoke-FalconHostAction -Name contain
+}
+```
+
+<Note>
+  Use `Get-FalconHost -Total` to check counts before performing bulk operations. Always test filters with `-Limit` before using `-All`.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Detection Management" icon="shield-halved" href="/examples/detection-management">
+    Manage and respond to detections
+  </Card>
+  <Card title="RTR Automation" icon="terminal" href="/examples/rtr-automation">
+    Automate Real-time Response operations
+  </Card>
+</CardGroup>

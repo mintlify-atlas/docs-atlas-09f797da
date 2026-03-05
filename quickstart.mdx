@@ -1,80 +1,388 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with PSFalcon in minutes
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you begin, ensure you have:
 
-### Step 1: Set up your local environment
+- PSFalcon installed ([Installation Guide](/installation))
+- CrowdStrike Falcon API credentials (Client ID and Client Secret)
+- PowerShell 5.1+ (Windows) or PowerShell 6+ (Linux/macOS)
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Authentication
 
-### Step 2: Deploy your changes
+Authenticate to the CrowdStrike Falcon API using your OAuth2 credentials.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+### Basic Authentication
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+Connect to the default US-1 cloud:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+```powershell
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret'
+```
 
-### Step 3: Go live
+### Cloud-Specific Authentication
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+Connect to a specific CrowdStrike cloud region:
 
-## Next steps
+<CodeGroup>
+```powershell US-1 (Default)
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret' -Cloud 'us-1'
+```
 
-Now that you have your docs running, explore these key features:
+```powershell US-2
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret' -Cloud 'us-2'
+```
 
-<CardGroup cols={2}>
+```powershell EU-1
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret' -Cloud 'eu-1'
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+```powershell US GovCloud
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret' -Cloud 'us-gov-1'
+```
+</CodeGroup>
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+### Multi-CID (MSSP) Authentication
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+For Falcon Flight Control environments, specify a member CID:
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```powershell
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret' -MemberCid 'child_cid'
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Your credentials and token are cached for automatic re-use. PSFalcon automatically refreshes your token when it's about to expire (within 240 seconds).
 </Note>
+
+### Verify Authentication
+
+Check your authentication status:
+
+```powershell
+Test-FalconToken
+```
+
+**Example output:**
+```
+Token     : True
+Hostname  : https://api.crowdstrike.com
+ClientId  : 1234567890abcdef1234567890abcdef
+MemberCid :
+```
+
+<Tip>
+  Use `Show-FalconToken` to display your current access token value, or `Revoke-FalconToken` to revoke your token and clear cached credentials.
+</Tip>
+
+## Your First Query
+
+Now that you're authenticated, let's retrieve information about hosts in your environment.
+
+### List Host IDs
+
+Get a list of host identifiers:
+
+```powershell
+Get-FalconHost
+```
+
+This returns an array of host IDs (AIDs):
+```
+1234567890abcdef1234567890abcdef
+abcdef1234567890abcdef1234567890
+...
+```
+
+### Get Host Details
+
+Retrieve detailed information about specific hosts:
+
+```powershell
+# Get details for specific host IDs
+$HostIds = @('1234567890abcdef1234567890abcdef', 'abcdef1234567890abcdef1234567890')
+Get-FalconHost -Id $HostIds
+```
+
+### Search with Filters
+
+Use Falcon Query Language (FQL) to filter results:
+
+<CodeGroup>
+```powershell Hostname Filter
+# Find hosts by hostname
+Get-FalconHost -Filter "hostname:'DESKTOP-*'" -Detailed
+```
+
+```powershell Platform Filter
+# Find Windows hosts
+Get-FalconHost -Filter "platform_name:'Windows'" -Detailed
+```
+
+```powershell Last Seen Filter
+# Find hosts seen in the last 24 hours
+Get-FalconHost -Filter "last_seen:>='now-24h'" -Detailed
+```
+
+```powershell Combined Filters
+# Combine multiple conditions
+Get-FalconHost -Filter "platform_name:'Windows'+hostname:'*SERVER*'" -Detailed
+```
+</CodeGroup>
+
+### Retrieve All Results
+
+By default, API requests return up to 100 results. Use `-All` to retrieve everything:
+
+```powershell
+# Get all hosts in your environment
+$AllHosts = Get-FalconHost -Detailed -All
+
+# Count total hosts
+$AllHosts.Count
+
+# Display first 5 hosts
+$AllHosts | Select-Object -First 5 | Format-Table device_id, hostname, platform_name, last_seen
+```
+
+## Common Operations
+
+### Working with Detections
+
+Retrieve and manage detections:
+
+```powershell
+# Get recent detections
+$Detections = Get-FalconDetection -Filter "created_timestamp:>='now-7d'" -Detailed
+
+# Count detections by severity
+$Detections | Group-Object max_severity | Select-Object Name, Count
+
+# Update detection status
+$DetectionIds = $Detections | Where-Object { $_.status -eq 'new' } | Select-Object -ExpandProperty detection_id
+Invoke-FalconAlertAction -Name update_status -Value in_progress -Id $DetectionIds
+```
+
+### Managing Host Groups
+
+```powershell
+# List all host groups
+$Groups = Get-FalconHostGroup -Detailed
+
+# Create a new host group
+$NewGroup = New-FalconHostGroup -Name 'Production Servers' -Description 'All production server hosts'
+
+# Get members of a host group
+Get-FalconHostGroupMember -Id $NewGroup.id
+```
+
+### Real-time Response
+
+Start an RTR session and execute commands:
+
+```powershell
+# Start RTR session on a host
+$Session = Start-FalconSession -Id '1234567890abcdef1234567890abcdef'
+
+# Run a command
+$Command = Invoke-FalconCommand -SessionId $Session.session_id -Command 'ps'
+
+# Check command status
+Confirm-FalconCommand -Id $Command.cloud_request_id
+
+# Remove the session
+Remove-FalconSession -Id $Session.session_id
+```
+
+### Policy Management
+
+```powershell
+# Get prevention policies
+$PreventionPolicies = Get-FalconPreventionPolicy -Detailed
+
+# Find hosts using a specific policy
+Get-FalconPreventionPolicyMember -Id $PreventionPolicies[0].id
+
+# Get sensor update policies
+$SensorPolicies = Get-FalconSensorUpdatePolicy -Detailed
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Secure Credential Storage">
+    Never hardcode credentials in scripts. Use secure methods:
+    
+    ```powershell
+    # Store credentials securely
+    $Credential = Get-Credential
+    $ClientId = $Credential.UserName
+    $ClientSecret = $Credential.GetNetworkCredential().Password
+    
+    Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+    ```
+  </Step>
+  
+  <Step title="Use Filters Wisely">
+    Filter on the server side to reduce data transfer and improve performance:
+    
+    ```powershell
+    # Good - filters on server
+    Get-FalconHost -Filter "platform_name:'Windows'" -Detailed
+    
+    # Avoid - retrieves all hosts then filters locally
+    Get-FalconHost -Detailed -All | Where-Object { $_.platform_name -eq 'Windows' }
+    ```
+  </Step>
+  
+  <Step title="Handle Rate Limits">
+    PSFalcon automatically handles rate limits, but for bulk operations, add delays:
+    
+    ```powershell
+    foreach ($Host in $HostList) {
+        Invoke-FalconHostAction -Name hide_host -Id $Host.device_id
+        Start-Sleep -Milliseconds 100
+    }
+    ```
+  </Step>
+  
+  <Step title="Error Handling">
+    Implement proper error handling:
+    
+    ```powershell
+    try {
+        $Hosts = Get-FalconHost -Filter "hostname:'NONEXISTENT'" -Detailed
+        if ($Hosts) {
+            Write-Host "Found $($Hosts.Count) hosts"
+        } else {
+            Write-Host "No hosts found"
+        }
+    } catch {
+        Write-Error "Failed to retrieve hosts: $_"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Complete Example Script
+
+Here's a complete script that demonstrates common PSFalcon operations:
+
+```powershell
+# ============================================
+# PSFalcon Quick Start Example
+# ============================================
+
+# 1. Authenticate to Falcon API
+Request-FalconToken -ClientId 'your_client_id' -ClientSecret 'your_client_secret'
+
+# Verify authentication
+$TokenStatus = Test-FalconToken
+if ($TokenStatus.Token) {
+    Write-Host "✓ Successfully authenticated to $($TokenStatus.Hostname)" -ForegroundColor Green
+} else {
+    Write-Error "Authentication failed"
+    exit
+}
+
+# 2. Get host information
+Write-Host "`n--- Retrieving Host Information ---" -ForegroundColor Cyan
+
+# Get Windows hosts seen in the last 7 days
+$RecentHosts = Get-FalconHost -Filter "platform_name:'Windows'+last_seen:>='now-7d'" -Detailed
+
+Write-Host "Found $($RecentHosts.Count) Windows hosts active in the last 7 days"
+
+# Display summary
+$RecentHosts | Select-Object -First 5 | Format-Table `
+    @{Label='Hostname';Expression={$_.hostname}}, `
+    @{Label='OS Version';Expression={$_.os_version}}, `
+    @{Label='Agent Version';Expression={$_.agent_version}}, `
+    @{Label='Last Seen';Expression={$_.last_seen}}
+
+# 3. Check for stale hosts
+Write-Host "`n--- Checking for Stale Hosts ---" -ForegroundColor Cyan
+
+$StaleHosts = Get-FalconHost -Filter "last_seen:<='now-30d'" -Detailed
+
+if ($StaleHosts.Count -gt 0) {
+    Write-Warning "Found $($StaleHosts.Count) hosts not seen in 30+ days"
+    $StaleHosts | Select-Object -First 10 | Format-Table hostname, last_seen
+} else {
+    Write-Host "✓ No stale hosts found" -ForegroundColor Green
+}
+
+# 4. Get detection summary
+Write-Host "`n--- Detection Summary ---" -ForegroundColor Cyan
+
+$Detections = Get-FalconDetection -Filter "created_timestamp:>='now-7d'" -Detailed
+
+Write-Host "Total detections in last 7 days: $($Detections.Count)"
+
+# Group by severity
+$DetectionsBySeverity = $Detections | Group-Object max_severity | 
+    Select-Object @{Name='Severity';Expression={$_.Name}}, Count | 
+    Sort-Object Severity
+
+$DetectionsBySeverity | Format-Table -AutoSize
+
+# 5. List host groups
+Write-Host "`n--- Host Groups ---" -ForegroundColor Cyan
+
+$HostGroups = Get-FalconHostGroup -Detailed
+
+Write-Host "Total host groups: $($HostGroups.Count)"
+$HostGroups | Select-Object -First 5 | Format-Table name, description, group_type
+
+# 6. Clean up - revoke token
+Write-Host "`n--- Revoking Token ---" -ForegroundColor Cyan
+Revoke-FalconToken
+Write-Host "✓ Token revoked successfully" -ForegroundColor Green
+```
+
+<Warning>
+  Replace `'your_client_id'` and `'your_client_secret'` with your actual API credentials before running the script.
+</Warning>
+
+## Exploring Available Cmdlets
+
+Discover all PSFalcon cmdlets:
+
+```powershell
+# List all cmdlets
+Get-Command -Module PSFalcon
+
+# Search for specific cmdlets
+Get-Command -Module PSFalcon -Name '*Host*'
+Get-Command -Module PSFalcon -Name '*Detection*'
+Get-Command -Module PSFalcon -Name '*Policy*'
+
+# Get help for a cmdlet
+Get-Help Get-FalconHost -Full
+Get-Help Request-FalconToken -Examples
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Explore all available cmdlets and parameters
+  </Card>
+  <Card title="Example Scripts" icon="code" href="https://github.com/CrowdStrike/psfalcon/tree/master/samples">
+    Browse real-world automation examples
+  </Card>
+  <Card title="FQL Guide" icon="filter" href="/guides/fql">
+    Learn Falcon Query Language for advanced filtering
+  </Card>
+  <Card title="Real-time Response" icon="terminal" href="/guides/real-time-response">
+    Master RTR automation with PSFalcon
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+<Tip>
+  Need help? Check the [PSFalcon Wiki](https://github.com/CrowdStrike/psfalcon/wiki) for comprehensive documentation, or use PowerShell's built-in help system with `Get-Help <cmdlet-name> -Full`.
+</Tip>

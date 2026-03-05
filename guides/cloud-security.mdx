@@ -1,0 +1,509 @@
+---
+title: Cloud Security
+description: Secure AWS, Azure, and GCP environments with CrowdStrike Falcon Cloud Security
+---
+
+PSFalcon provides cmdlets to manage Cloud Security Posture Management (CSPM) across AWS, Azure, and GCP cloud environments.
+
+## Overview
+
+Falcon Cloud Security (formerly Horizon) provides:
+
+- **CSPM**: Configuration assessment and compliance monitoring
+- **Cloud Workload Protection**: Runtime protection for cloud instances
+- **Kubernetes Security**: Container and orchestration security
+- **Data Security Posture Management (DSPM)**: Data discovery and classification
+
+## AWS Account Management
+
+### Registering AWS Accounts
+
+<Steps>
+
+<Step title="Generate Registration Script">
+```powershell
+# Get AWS registration URL
+$Link = Get-FalconCloudAwsLink
+
+# Open the URL in browser to create CloudFormation stack
+Start-Process $Link
+```
+</Step>
+
+<Step title="Register Account">
+```powershell
+# Register single AWS account
+New-FalconCloudAwsAccount -AccountId '123456789012' `
+  -CloudtrailRegion 'us-east-1' `
+  -IamRoleArn 'arn:aws:iam::123456789012:role/CrowdStrikeFalcon'
+```
+</Step>
+
+<Step title="Verify Registration">
+```powershell
+# Check account status
+Get-FalconCloudAwsAccount -Id '123456789012'
+
+# Wait for operational status
+$Account = Get-FalconCloudAwsAccount -Id '123456789012'
+while ($Account.status -ne 'Event_DiscoverAccountStatusOperational') {
+    Write-Host "Status: $($Account.status) - waiting..."
+    Start-Sleep -Seconds 30
+    $Account = Get-FalconCloudAwsAccount -Id '123456789012'
+}
+
+Write-Host "Account is operational!"
+```
+</Step>
+
+</Steps>
+
+### List and Search AWS Accounts
+
+```powershell
+# List all registered AWS accounts
+Get-FalconCloudAwsAccount -All
+
+# Filter by status
+Get-FalconCloudAwsAccount -Status operational
+
+# Get accounts in organization
+Get-FalconCloudAwsAccount -OrganizationId 'o-abc123def456'
+
+# Search by scan type
+Get-FalconCloudAwsAccount -ScanType full
+```
+
+### Update AWS Account Configuration
+
+<CodeGroup>
+
+```powershell Enable Features
+# Enable behavior assessment
+Edit-FalconCloudAwsAccount -AccountId '123456789012' `
+  -BehaviorAssessmentEnabled $true
+
+# Enable sensor management
+Edit-FalconCloudAwsAccount -AccountId '123456789012' `
+  -SensorManagementEnabled $true
+
+# Enable DSPM
+Edit-FalconCloudAwsAccount -AccountId '123456789012' `
+  -DspmEnabled $true `
+  -DspmRole 'arn:aws:iam::123456789012:role/CrowdStrikeDSPM'
+```
+
+```powershell Update IAM Role
+# Update IAM role ARN
+Edit-FalconCloudAwsAccount -AccountId '123456789012' `
+  -IamRoleArn 'arn:aws:iam::123456789012:role/CrowdStrikeFalconV2'
+```
+
+```powershell Remediation Settings
+# Configure remediation
+Edit-FalconCloudAwsAccount -AccountId '123456789012' `
+  -RemediationRegion 'us-east-1' `
+  -RemediationTouAccepted (Get-Date).ToString('yyyy-MM-ddTHH:mm:ssZ')
+```
+
+</CodeGroup>
+
+### Remove AWS Accounts
+
+```powershell
+# Delete AWS account registration
+Remove-FalconCloudAwsAccount -Id '123456789012'
+
+# Bulk removal
+$AccountsToRemove = Get-FalconCloudAwsAccount -Status provisioned
+foreach ($Account in $AccountsToRemove) {
+    Remove-FalconCloudAwsAccount -Id $Account.id
+}
+```
+
+## Azure Subscription Management
+
+### Register Azure Subscriptions
+
+```powershell
+# Get Azure registration script
+$Script = Get-FalconCloudAzureScript
+
+# Save script
+$Script | Out-File -FilePath './register-azure.sh'
+
+# After running script in Azure, register subscription
+New-FalconCloudAzureAccount -SubscriptionId 'abc123-def456-ghi789' `
+  -TenantId 'tenant-123-456'
+```
+
+### List Azure Subscriptions
+
+```powershell
+# Get all Azure subscriptions
+Get-FalconCloudAzureAccount -All
+
+# Get specific subscription
+Get-FalconCloudAzureAccount -Id @('abc123-def456-ghi789')
+
+# Filter by status
+Get-FalconCloudAzureAccount -Status operational
+```
+
+### Update Azure Configuration
+
+```powershell
+# Update Azure subscription
+Edit-FalconCloudAzureAccount -Id 'abc123-def456-ghi789' `
+  -TenantId 'tenant-updated-456'
+
+# Remove Azure subscription
+Remove-FalconCloudAzureAccount -Id @('abc123-def456-ghi789')
+```
+
+## GCP Project Management
+
+### Register GCP Projects
+
+```powershell
+# Get GCP registration script
+$Script = Get-FalconCloudGcpScript
+
+# Register GCP project
+New-FalconCloudGcpAccount -ParentId 'organizations/123456' `
+  -ParentType organization `
+  -ProjectId 'my-gcp-project-123'
+```
+
+### Manage GCP Accounts
+
+```powershell
+# List GCP projects
+Get-FalconCloudGcpAccount -All
+
+# Get specific project
+Get-FalconCloudGcpAccount -Id @('projects/my-gcp-project-123')
+
+# Update GCP project
+Edit-FalconCloudGcpAccount -Id 'projects/my-gcp-project-123' `
+  -ServiceAccountId '12345678901234567890'
+
+# Remove GCP project
+Remove-FalconCloudGcpAccount -Id @('projects/my-gcp-project-123')
+```
+
+## Cloud Security Assets
+
+### Discover Cloud Resources
+
+```powershell
+# Search for cloud assets
+Get-FalconCloudAsset -Filter "asset_type:'instance'" -All
+
+# Find EC2 instances
+Get-FalconCloudAsset -Filter "cloud_provider:'aws'+asset_type:'instance'" -Detailed
+
+# Get Azure VMs
+Get-FalconCloudAsset -Filter "cloud_provider:'azure'+asset_type:'virtual-machine'" -All
+
+# Search by tag
+Get-FalconCloudAsset -Filter "tags.Environment:'Production'" -Detailed
+```
+
+### Asset Details and Inventory
+
+```powershell
+# Get detailed asset information
+$Assets = Get-FalconCloudAsset -Detailed -All
+
+# Export inventory
+$Assets | Select-Object asset_id, asset_type, cloud_provider, account_id, region | 
+  Export-Csv -Path './cloud-inventory.csv' -NoTypeInformation
+
+# Count by cloud provider
+$Assets | Group-Object cloud_provider | Select-Object Name, Count
+
+# Count by type
+$Assets | Group-Object asset_type | Select-Object Name, Count
+```
+
+## Compliance and Posture Assessment
+
+### View Compliance Violations
+
+```powershell
+# Get CSPM findings
+Get-FalconHorizonPolicy -Detailed -All
+
+# Search for specific compliance benchmark
+Get-FalconHorizonPolicy -Filter "benchmark:'CIS AWS Foundations'" -Detailed
+
+# Get policy violations
+Get-FalconHorizonPolicyViolation -Filter "severity:'high'" -All
+```
+
+### Remediation
+
+```powershell
+# Get remediation actions
+Get-FalconHorizonRemediation -Filter "account_id:'123456789012'" -Detailed
+
+# Execute remediation
+Invoke-FalconHorizonAction -Action remediate -Id $ViolationId
+```
+
+## Kubernetes Protection
+
+### Register Kubernetes Clusters
+
+```powershell
+# Get Kubernetes deployment YAML
+Get-FalconContainerYaml -ClusterName 'prod-cluster-01' -OutputPath './k8s-falcon.yaml'
+
+# List registered clusters
+Get-FalconContainerCluster -All
+
+# Get cluster details
+Get-FalconContainerCluster -Id 'cluster-id-123' -Detailed
+```
+
+### Container Security
+
+```powershell
+# Search for container images
+Get-FalconContainerImage -Filter "layer_digest:*'sha256'*" -Detailed -All
+
+# Get vulnerable images
+Get-FalconContainerImage -Filter "vulnerability_count:>0" -Detailed
+
+# List container vulnerabilities
+Get-FalconContainerVulnerability -Filter "severity:'critical'" -All
+```
+
+## Multi-Cloud Management Workflow
+
+<Steps>
+
+<Step title="Inventory All Cloud Accounts">
+```powershell
+# Create inventory of all cloud environments
+$CloudInventory = @()
+
+# AWS accounts
+$AwsAccounts = Get-FalconCloudAwsAccount -All
+foreach ($Account in $AwsAccounts) {
+    $CloudInventory += [PSCustomObject]@{
+        Provider = 'AWS'
+        AccountId = $Account.account_id
+        Status = $Account.status
+        Organization = $Account.organization_id
+    }
+}
+
+# Azure subscriptions
+$AzureAccounts = Get-FalconCloudAzureAccount -All
+foreach ($Account in $AzureAccounts) {
+    $CloudInventory += [PSCustomObject]@{
+        Provider = 'Azure'
+        AccountId = $Account.subscription_id
+        Status = $Account.status
+        Organization = $Account.tenant_id
+    }
+}
+
+# GCP projects
+$GcpAccounts = Get-FalconCloudGcpAccount -All
+foreach ($Account in $GcpAccounts) {
+    $CloudInventory += [PSCustomObject]@{
+        Provider = 'GCP'
+        AccountId = $Account.project_id
+        Status = $Account.status
+        Organization = $Account.parent_id
+    }
+}
+
+$CloudInventory | Format-Table
+```
+</Step>
+
+<Step title="Assess Security Posture">
+```powershell
+# Get high-severity findings across all clouds
+$Findings = Get-FalconHorizonPolicyViolation -Filter "severity:'high'" -All
+
+# Group by cloud provider
+$Findings | Group-Object cloud_provider | Select-Object Name, Count
+
+# Group by policy
+$Findings | Group-Object policy_name | Select-Object Name, Count | Sort-Object Count -Descending
+```
+</Step>
+
+<Step title="Enable Advanced Features">
+```powershell
+# Enable DSPM for all AWS accounts
+$AwsAccounts = Get-FalconCloudAwsAccount -Status operational
+foreach ($Account in $AwsAccounts) {
+    Edit-FalconCloudAwsAccount -AccountId $Account.account_id `
+      -DspmEnabled $true `
+      -BehaviorAssessmentEnabled $true `
+      -SensorManagementEnabled $true
+    
+    Write-Host "Enabled features for: $($Account.account_id)"
+}
+```
+</Step>
+
+<Step title="Generate Compliance Report">
+```powershell
+# Export compliance status
+$Report = @()
+
+foreach ($Account in $CloudInventory) {
+    $Violations = Get-FalconHorizonPolicyViolation -Filter "account_id:'$($Account.AccountId)'" -All
+    
+    $Report += [PSCustomObject]@{
+        Provider = $Account.Provider
+        AccountId = $Account.AccountId
+        TotalViolations = $Violations.Count
+        CriticalViolations = ($Violations | Where-Object { $_.severity -eq 'critical' }).Count
+        HighViolations = ($Violations | Where-Object { $_.severity -eq 'high' }).Count
+    }
+}
+
+$Report | Export-Csv -Path './compliance-report.csv' -NoTypeInformation
+```
+</Step>
+
+</Steps>
+
+## Monitoring Cloud Resources
+
+### Continuous Discovery
+
+```powershell
+# Monitor for new cloud assets
+function Watch-CloudAssets {
+    param(
+        [int]$IntervalMinutes = 60
+    )
+    
+    $LastCount = (Get-FalconCloudAsset -All).Count
+    Write-Host "Starting with $LastCount assets"
+    
+    while ($true) {
+        Start-Sleep -Seconds ($IntervalMinutes * 60)
+        
+        $CurrentCount = (Get-FalconCloudAsset -All).Count
+        $NewAssets = $CurrentCount - $LastCount
+        
+        if ($NewAssets -gt 0) {
+            Write-Host "[$(Get-Date)] Discovered $NewAssets new assets"
+            
+            # Get recently discovered assets
+            $Recent = Get-FalconCloudAsset -Filter "first_seen:>='now-${IntervalMinutes}m'" -Detailed
+            $Recent | Select-Object asset_id, asset_type, cloud_provider
+        }
+        
+        $LastCount = $CurrentCount
+    }
+}
+
+# Start monitoring
+Watch-CloudAssets -IntervalMinutes 30
+```
+
+### Alert on Misconfigurations
+
+```powershell
+# Check for critical CSPM violations
+$CriticalViolations = Get-FalconHorizonPolicyViolation -Filter "severity:'critical'" -All
+
+if ($CriticalViolations.Count -gt 0) {
+    Write-Warning "CRITICAL: Found $($CriticalViolations.Count) critical violations!"
+    
+    # Group by account
+    $ByAccount = $CriticalViolations | Group-Object account_id
+    
+    foreach ($Group in $ByAccount) {
+        Write-Host "`nAccount: $($Group.Name)"
+        $Group.Group | Select-Object policy_name, resource_id | Format-Table
+    }
+}
+```
+
+## AWS Organization Management
+
+```powershell
+# Register AWS organization
+New-FalconCloudAwsAccount -OrganizationId 'o-abc123def456' `
+  -CloudtrailRegion 'us-east-1' `
+  -IamRoleArn 'arn:aws:iam::123456789012:role/CrowdStrikeFalcon'
+
+# List organization accounts
+Get-FalconCloudAwsAccount -OrganizationId 'o-abc123def456' -All
+
+# Group accounts by organization
+Get-FalconCloudAwsAccount -GroupBy organization
+```
+
+## Best Practices
+
+<Note>
+- **Enable all protection features** (DSPM, behavior assessment, sensor management) for comprehensive coverage
+- **Use organization-level registration** in AWS for centralized management
+- **Monitor account status** regularly to ensure operational state
+- **Tag cloud resources** consistently for better asset tracking
+- **Set up automated remediation** for common misconfigurations
+- **Review compliance findings** weekly and prioritize critical/high severity
+</Note>
+
+<Warning>
+**IAM Role Requirements**: Ensure IAM roles have necessary permissions before registration. Review CrowdStrike documentation for minimum required policies.
+</Warning>
+
+## Troubleshooting
+
+### Account Not Operational
+
+```powershell
+# Check account status and errors
+$Account = Get-FalconCloudAwsAccount -Id '123456789012'
+
+if ($Account.status -ne 'Event_DiscoverAccountStatusOperational') {
+    Write-Warning "Account status: $($Account.status)"
+    
+    # Check for errors
+    if ($Account.errors) {
+        $Account.errors | ForEach-Object {
+            Write-Host "Error: $_"
+        }
+    }
+    
+    # Verify IAM role
+    Write-Host "IAM Role: $($Account.iam_role_arn)"
+    Write-Host "CloudTrail Region: $($Account.cloudtrail_region)"
+}
+```
+
+### Missing Assets
+
+```powershell
+# Force asset sync
+Invoke-FalconCloudDiscovery -AccountId '123456789012'
+
+# Check last scan time
+$Account = Get-FalconCloudAwsAccount -Id '123456789012'
+Write-Host "Last scanned: $($Account.last_scanned)"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Working with Hosts" icon="server" href="./working-with-hosts">
+    Manage cloud workload protection on instances
+  </Card>
+  <Card title="Threat Intelligence" icon="magnifying-glass" href="./threat-intelligence">
+    Apply threat intelligence to cloud environments
+  </Card>
+</CardGroup>

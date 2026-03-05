@@ -1,0 +1,200 @@
+---
+title: Spotlight Vulnerability Management
+description: Manage vulnerabilities discovered by Falcon Spotlight
+---
+
+Falcon Spotlight provides vulnerability assessment and management capabilities for devices in your environment. Use these cmdlets to search for vulnerabilities, retrieve remediation details, and review evaluation logic.
+
+## Get-FalconVulnerability
+
+Search for Falcon Spotlight vulnerabilities.
+
+```powershell
+Get-FalconVulnerability -Filter "status:'open'" -Detailed
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Vulnerability identifier(s) in format `[aid]_[cve]`
+</ParamField>
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Facet" type="string[]">
+  Include additional properties: `cve`, `evaluation_logic`, `host_info`, `remediation`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Options: `created_timestamp.asc`, `created_timestamp.desc`, `closed_timestamp.asc`, `closed_timestamp.desc`, `updated_timestamp.asc`, `updated_timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example: Find Critical Vulnerabilities
+
+```powershell
+# Search for open critical vulnerabilities
+$Vulnerabilities = Get-FalconVulnerability -Filter "status:'open'+severity:'critical'" -Detailed -All
+
+# Group by CVE
+$Vulnerabilities | Group-Object -Property cve.id | Select-Object Name, Count
+```
+
+### Example: Get Vulnerability Details
+
+```powershell
+# Get detailed information for specific vulnerabilities
+$VulnIds = @('aid1_cve123', 'aid2_cve456')
+Get-FalconVulnerability -Id $VulnIds
+```
+
+## Get-FalconRemediation
+
+Retrieve details about remediations for Falcon Spotlight vulnerabilities.
+
+```powershell
+Get-FalconRemediation -Id <remediation_id>
+```
+
+### Parameters
+
+<ParamField path="Id" type="object[]" required>
+  Remediation identifier(s) or detailed vulnerability objects containing remediation IDs
+</ParamField>
+
+### Example: Get Remediation Steps
+
+```powershell
+# Get vulnerabilities with remediation facet
+$Vulns = Get-FalconVulnerability -Filter "status:'open'" -Facet remediation -Detailed
+
+# Extract and retrieve remediation details
+$Vulns | Get-FalconRemediation
+```
+
+## Get-FalconVulnerabilityLogic
+
+Search for Falcon Spotlight vulnerability evaluation logic.
+
+```powershell
+Get-FalconVulnerabilityLogic -Filter "created_timestamp:>'2024-01-01'" -Detailed
+```
+
+### Parameters
+
+<ParamField path="Id" type="object[]">
+  Vulnerability logic identifier(s) or detailed vulnerability objects
+</ParamField>
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example: Review Evaluation Logic
+
+```powershell
+# Get vulnerabilities with evaluation logic facet
+$Vulns = Get-FalconVulnerability -Filter "cve.id:'CVE-2024-1234'" -Facet evaluation_logic -Detailed
+
+# Retrieve evaluation logic details
+$Vulns | Get-FalconVulnerabilityLogic
+```
+
+## Use Cases
+
+### Vulnerability Assessment Report
+
+```powershell
+# Generate vulnerability report by severity
+$OpenVulns = Get-FalconVulnerability -Filter "status:'open'" -Detailed -All
+
+$Report = $OpenVulns | Group-Object -Property { $_.cve.severity } | ForEach-Object {
+    [PSCustomObject]@{
+        Severity = $_.Name
+        Count = $_.Count
+        CVEs = ($_.Group | Select-Object -ExpandProperty cve.id -Unique) -join ', '
+    }
+}
+
+$Report | Format-Table -AutoSize
+```
+
+### Remediation Tracking
+
+```powershell
+# Get vulnerabilities with available remediations
+$VulnsWithRemediation = Get-FalconVulnerability -Filter "status:'open'" -Facet remediation -Detailed
+
+# Extract remediation details
+$Remediations = $VulnsWithRemediation | Get-FalconRemediation
+
+# Display remediation information
+$Remediations | Select-Object id, title, action | Format-Table -AutoSize
+```
+
+### Host-Specific Vulnerabilities
+
+```powershell
+# Find vulnerabilities for a specific host
+$HostAid = 'abc123...'
+$HostVulns = Get-FalconVulnerability -Filter "aid:'$HostAid'" -Facet host_info,cve -Detailed
+
+# Display vulnerabilities with host context
+$HostVulns | Select-Object cve.id, cve.severity, host_info.hostname | Format-Table
+```
+
+<Note>
+Requires **Vulnerabilities: Read** scope for all Spotlight cmdlets.
+</Note>
+
+## Related Resources
+
+- [Falcon Spotlight Overview](https://www.crowdstrike.com/products/exposure-management/falcon-spotlight/)
+- [Vulnerability Management Best Practices](https://www.crowdstrike.com/cybersecurity-101/vulnerability-management/)

@@ -1,0 +1,413 @@
+---
+title: Error Handling
+description: Understanding how PSFalcon handles errors, API failures, and response validation
+icon: triangle-exclamation
+---
+
+## Overview
+
+PSFalcon provides comprehensive error handling for API responses, parameter validation, and runtime exceptions. Errors are written to PowerShell's error stream with detailed context to help troubleshoot issues.
+
+## Error Types
+
+PSFalcon handles several types of errors:
+
+<AccordionGroup>
+  <Accordion title="API Response Errors">
+    Errors returned from the Falcon API in the `errors` property of the response.
+    
+    From `/home/daytona/workspace/source/private/Private.ps1:1328-1340`:
+    ```powershell
+    # API errors are extracted from the response and written to the error stream
+    # Each error includes:
+    # - Error message from the API
+    # - trace_id for troubleshooting with CrowdStrike support
+    # - Original request context
+    ```
+  </Accordion>
+  
+  <Accordion title="Parameter Validation Errors">
+    Errors from invalid parameter values, patterns, or combinations.
+    
+    ```powershell
+    # Example: Invalid ClientId pattern
+    Request-FalconToken -ClientId 'invalid'
+    # Error: The argument "invalid" does not match the "^[a-fA-F0-9]{32}$" pattern
+    ```
+  </Accordion>
+  
+  <Accordion title="FQL (Falcon Query Language) Errors">
+    Validation errors for malformed filter expressions.
+    
+    From `/home/daytona/workspace/source/private/Private.ps1:1182-1197`:
+    ```powershell
+    # FQL statements are validated before submission
+    Get-FalconHost -Filter 'invalid syntax'
+    # Error: 'invalid syntax' is not a valid Falcon Query Language statement
+    ```
+  </Accordion>
+  
+  <Accordion title="Runtime Errors">
+    Errors from missing dependencies, network issues, or unexpected conditions.
+  </Accordion>
+</AccordionGroup>
+
+## API Error Responses
+
+From `/home/daytona/workspace/source/private/Private.ps1:1307-1365`, PSFalcon's `Write-Result` function processes API responses:
+
+<Steps>
+  <Step title="Response Processing">
+    Every API response is parsed for:
+    - `meta` - Metadata including pagination and trace_id
+    - `errors` - Array of error objects
+    - `resources` - The actual data payload
+  </Step>
+  
+  <Step title="Error Extraction">
+    If errors are present in the response:
+    ```powershell
+    # Each error is converted to a PowerShell ErrorRecord
+    # - Exception message: JSON representation of the error
+    # - ErrorId: trace_id from meta.trace_id
+    # - Category: InvalidResult
+    # - TargetObject: The original request
+    ```
+  </Step>
+  
+  <Step title="Error Stream Output">
+    Errors are written to PowerShell's error stream using `$PSCmdlet.WriteError()`.
+    
+    This allows you to:
+    - Catch errors with `try/catch`
+    - Suppress errors with `-ErrorAction`
+    - Access error details in `$Error[0]`
+  </Step>
+</Steps>
+
+## Handling API Errors
+
+### Using Try/Catch
+
+```powershell
+try {
+    Get-FalconHost -Filter "hostname:'nonexistent'"
+} catch {
+    Write-Host "Error occurred: $($_.Exception.Message)"
+    Write-Host "Trace ID: $($_.FullyQualifiedErrorId)"
+}
+```
+
+### Using ErrorAction
+
+```powershell
+# Suppress errors and continue
+$Result = Get-FalconHost -Filter "invalid" -ErrorAction SilentlyContinue
+
+if (!$Result) {
+    Write-Warning "No results returned or error occurred"
+}
+```
+
+### Checking Error Details
+
+```powershell
+# Run command and examine the last error
+Get-FalconHost -Id 'invalid-id'
+
+if ($Error[0]) {
+    $LastError = $Error[0]
+    
+    Write-Host "Message: $($LastError.Exception.Message)"
+    Write-Host "Trace ID: $($LastError.FullyQualifiedErrorId)"
+    Write-Host "Category: $($LastError.CategoryInfo.Category)"
+}
+```
+
+## Parameter Validation
+
+PSFalcon validates parameters before making API requests:
+
+<CodeGroup>
+
+```powershell Pattern Validation
+# ClientId must be 32 hex characters
+Request-FalconToken -ClientId 'abc123'  # Fails validation
+
+# Valid format:
+Request-FalconToken -ClientId 'abc123def456789012345678901234ab'
+```
+
+```powershell Range Validation
+# Limit must be within allowed range
+Get-FalconHost -Limit 99999  # Exceeds maximum
+
+# Valid range (from devices.ps1:165):
+Get-FalconHost -Limit 5000  # Maximum for this endpoint
+```
+
+```powershell Required Properties
+# Some parameters require specific combinations
+Get-FalconHost -Include 'group_names' -Field 'device_id'  # Missing required field
+
+# Valid combination (from devices.ps1:224-230):
+Get-FalconHost -Include 'group_names' -Field 'device_id','groups' -Detailed
+```
+
+</CodeGroup>
+
+## FQL Validation
+
+Falcon Query Language (FQL) statements are validated before submission:
+
+```powershell
+# Invalid FQL syntax
+Get-FalconHost -Filter 'hostname'
+# Error: 'hostname' is not a valid Falcon Query Language statement
+
+# Valid FQL
+Get-FalconHost -Filter "hostname:'DESKTOP-*'"
+Get-FalconHost -Filter "last_seen:>'2024-01-01T00:00:00Z'"
+Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'"
+```
+
+From `/home/daytona/workspace/source/private/Private.ps1:1186-1188`, the FQL pattern is:
+```regex
+(?<FqlProperty>[\w\.]+):(?<FqlOperator>(!~?|~|(>|<)=?|\*)?)
+(?<FqlValue>[\w\d\s\.\-\*\[\]\\,'`:"]+)
+```
+
+<Note>
+  FQL validation is a client-side check. The API may return additional validation errors for semantically invalid queries.
+</Note>
+
+## Error Action Preference
+
+Control error behavior using PowerShell's `-ErrorAction` parameter:
+
+<Accordion title="Available ErrorAction Values">
+  | Value | Behavior |
+  |-------|----------|
+  | `Continue` | Display error and continue (default) |
+  | `SilentlyContinue` | Suppress error, continue execution |
+  | `Stop` | Display error and halt execution |
+  | `Inquire` | Prompt user for action |
+  | `Ignore` | Suppress error, don't add to `$Error` |
+</Accordion>
+
+```powershell
+# Stop on any error
+Get-FalconHost -Filter "invalid" -ErrorAction Stop
+
+# Suppress and continue
+Get-FalconHost -Filter "invalid" -ErrorAction SilentlyContinue
+
+# Set for entire session
+$ErrorActionPreference = 'Stop'
+```
+
+## Common Error Scenarios
+
+### Authentication Errors
+
+```powershell
+try {
+    Request-FalconToken -ClientId $Id -ClientSecret $Secret
+} catch {
+    if ($_.Exception.Message -match 'invalid_client') {
+        Write-Error "Invalid API credentials"
+    } elseif ($_.Exception.Message -match 'Missing required credentials') {
+        Write-Error "ClientId or ClientSecret not provided"
+    } else {
+        throw $_
+    }
+}
+```
+
+### Rate Limiting
+
+From `/home/daytona/workspace/source/public/oauth2.ps1:194-196`, PSFalcon automatically retries on rate limit (429) responses:
+
+```powershell
+# Rate limit handling is automatic
+# The module will retry the request when it receives:
+# - HTTP 429 (Too Many Requests)
+# - HTTP 308 (Redirect)
+```
+
+### Missing Resources
+
+```powershell
+try {
+    $Host = Get-FalconHost -Id 'nonexistent-id-123'
+    
+    if (!$Host) {
+        Write-Warning "Host not found"
+    }
+} catch {
+    Write-Error "Failed to retrieve host: $_"
+}
+```
+
+### Pagination Errors
+
+From `/home/daytona/workspace/source/private/Private.ps1:658-660`:
+
+```powershell
+# If pagination token is missing mid-request, PSFalcon throws an error:
+# "Aborted due to missing pagination token. [Retrieved X of Y]"
+
+try {
+    Get-FalconHost -All
+} catch {
+    if ($_.Exception.Message -match 'missing pagination token') {
+        Write-Warning "Pagination interrupted. Partial results may be available."
+    }
+}
+```
+
+## Logging and Debugging
+
+### Verbose Output
+
+Enable verbose logging to see detailed request/response information:
+
+```powershell
+# Enable verbose output
+Get-FalconHost -Limit 5 -Verbose
+
+# Output includes:
+# - Timestamp and command name
+# - Endpoint being called
+# - Pagination details
+# - Meta information from responses
+```
+
+From `/home/daytona/workspace/source/private/Private.ps1:1366-1370`, all operations log to the verbose stream:
+```powershell
+# Format: HH:mm:ss [CommandName] Message
+# Example: 14:23:45 [Get-FalconHost] Retrieved 100 of 500
+```
+
+### Trace IDs
+
+Every API response includes a `trace_id` for troubleshooting:
+
+```powershell
+try {
+    Get-FalconHost -Filter "invalid"
+} catch {
+    $TraceId = $_.FullyQualifiedErrorId
+    Write-Host "Report this trace_id to CrowdStrike Support: $TraceId"
+}
+```
+
+### WhatIf Support
+
+Many PSFalcon commands support `-WhatIf` to preview actions:
+
+```powershell
+# Preview without executing
+Request-FalconToken -ClientId $Id -ClientSecret $Secret -WhatIf
+
+# Output shows what would be executed:
+# What if: Performing the operation "POST" on target "..."
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Use Try/Catch for Critical Operations">
+    ```powershell
+    try {
+        Request-FalconToken -ClientId $Id -ClientSecret $Secret
+        $Hosts = Get-FalconHost -All
+    } catch {
+        Write-Error "Critical failure: $_"
+        exit 1
+    } finally {
+        if ((Test-FalconToken).Token) { Revoke-FalconToken }
+    }
+    ```
+  </Step>
+  
+  <Step title="Validate Results">
+    ```powershell
+    $Hosts = Get-FalconHost -Filter "hostname:'DESKTOP-*'"
+    
+    if (!$Hosts) {
+        Write-Warning "No hosts matched the filter"
+    } else {
+        Write-Host "Found $($Hosts.Count) hosts"
+    }
+    ```
+  </Step>
+  
+  <Step title="Log Error Details for Troubleshooting">
+    ```powershell
+    try {
+        Get-FalconHost -Id $Id
+    } catch {
+        $ErrorDetails = [PSCustomObject]@{
+            Message = $_.Exception.Message
+            TraceId = $_.FullyQualifiedErrorId
+            Category = $_.CategoryInfo.Category
+            Timestamp = Get-Date
+        }
+        
+        $ErrorDetails | Export-Csv -Path "errors.csv" -Append
+        throw $_
+    }
+    ```
+  </Step>
+  
+  <Step title="Handle Partial Results">
+    ```powershell
+    $Results = @()
+    
+    try {
+        $Results = Get-FalconHost -All -ErrorAction Stop
+    } catch {
+        if ($Results.Count -gt 0) {
+            Write-Warning "Partial results retrieved: $($Results.Count) items"
+            # Continue with partial results
+        } else {
+            throw $_
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Error Reference
+
+<AccordionGroup>
+  <Accordion title="Authentication Errors">
+    - `invalid_client` - Invalid ClientId or ClientSecret
+    - `Missing required credentials` - ClientId/ClientSecret not provided
+    - `no_access_request_made` - Token required but not available
+  </Accordion>
+  
+  <Accordion title="Validation Errors">
+    - `ParameterArgumentValidationError` - Parameter doesn't match required pattern
+    - `not a valid Falcon Query Language statement` - Invalid FQL syntax
+    - `Missing required property` - Object missing required fields
+  </Accordion>
+  
+  <Accordion title="Runtime Errors">
+    - `Aborted due to missing pagination token` - Pagination interrupted
+    - `Failed to initialize [ApiClient] object` - Client initialization failed
+    - HTTP 429 - Rate limit exceeded (automatically retried)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pagination" icon="arrows-left-right" href="/core/pagination">
+    Learn how PSFalcon handles large result sets automatically
+  </Card>
+  <Card title="Filtering" icon="filter" href="/core/filtering">
+    Master FQL syntax for precise queries
+  </Card>
+</CardGroup>

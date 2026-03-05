@@ -1,0 +1,392 @@
+---
+title: Real-Time Response
+description: Execute commands, retrieve files, and investigate hosts remotely
+---
+
+Real-Time Response (RTR) enables interactive command execution on hosts for investigation, remediation, and file collection.
+
+## Understanding RTR Sessions
+
+RTR uses sessions to execute commands on hosts. Sessions can be:
+
+- **Single-host sessions**: Interactive session with one host
+- **Batch sessions**: Execute commands across multiple hosts simultaneously
+
+### Session Types and Permissions
+
+<Steps>
+
+<Step title="Read-Only Commands">
+Requires `Real time response: Read` permission. Commands like `ls`, `ps`, `netstat`.
+</Step>
+
+<Step title="Active Responder Commands">
+Requires `Real time response: Write` permission. Adds `get`, `cp`, `rm`, `mkdir`.
+</Step>
+
+<Step title="Admin Commands">
+Requires `Real time response (admin): Write` permission. Adds `put`, `run`, `runscript`, `kill`.
+</Step>
+
+</Steps>
+
+## Starting RTR Sessions
+
+### Single-Host Session
+
+```powershell
+# Start a session with a host
+$HostId = 'a1b2c3d4e5f6789012345678901234ab'
+$Session = Start-FalconSession -Id $HostId
+
+# Session object contains session_id for subsequent commands
+$SessionId = $Session.session_id
+```
+
+### Batch Session
+
+```powershell
+# Start batch session with multiple hosts
+$HostIds = @('a1b2c3d4...', 'b2c3d4e5...', 'c3d4e5f6...')
+$BatchSession = Start-FalconSession -Id $HostIds -QueueOffline
+
+$BatchId = $BatchSession.batch_id
+```
+
+<Note>
+The `-QueueOffline` parameter queues the session for offline hosts. They will execute commands when they come online.
+</Note>
+
+## Executing Commands
+
+### Read-Only Commands
+
+<CodeGroup>
+
+```powershell List Processes
+# Execute 'ps' command
+$Command = Invoke-FalconCommand -Command ps -SessionId $SessionId -Wait
+
+# View results
+$Command.stdout
+```
+
+```powershell List Files
+# List directory contents
+$Command = Invoke-FalconCommand -Command ls -Argument 'C:\\Users' -SessionId $SessionId -Wait
+
+$Command.stdout
+```
+
+```powershell Network Connections
+# Show active network connections
+$Command = Invoke-FalconCommand -Command netstat -SessionId $SessionId -Wait
+
+$Command.stdout
+```
+
+```powershell File Hash
+# Calculate file hash
+$Command = Invoke-FalconCommand -Command filehash `
+  -Argument 'C:\\Windows\\System32\\cmd.exe' `
+  -SessionId $SessionId -Wait
+
+$Command.stdout
+```
+
+</CodeGroup>
+
+### Active Responder Commands
+
+```powershell
+# Retrieve a file from the host
+$GetCmd = Invoke-FalconResponderCommand -Command get `
+  -Argument 'C:\\Temp\\suspicious.exe' `
+  -SessionId $SessionId -Wait
+
+# Check get command status
+Confirm-FalconGetFile -SessionId $SessionId -Sha256 $GetCmd.sha256
+
+# Download the file (password: 'infected')
+Receive-FalconGetFile -SessionId $SessionId -Sha256 $GetCmd.sha256 -Path './evidence/'
+```
+
+<Warning>
+Files retrieved via RTR are downloaded as **password-protected .7z archives** with password `infected`. Handle retrieved files according to your security policies.
+</Warning>
+
+### Admin Commands
+
+<CodeGroup>
+
+```powershell Upload and Run
+# First, upload a 'put' file
+Send-FalconPutFile -Path './tools/scanner.exe' -Name 'scanner' -Description 'Security scanner'
+
+# Use put-and-run to execute it
+Invoke-FalconAdminCommand -Command 'put-and-run' `
+  -Argument 'scanner --quick-scan' `
+  -SessionId $SessionId -Wait
+```
+
+```powershell Run Script
+# Upload a PowerShell script
+Send-FalconScript -Path './scripts/investigate.ps1' `
+  -Name 'investigate' `
+  -Platform windows `
+  -PermissionType private
+
+# Execute the script
+Invoke-FalconAdminCommand -Command runscript `
+  -Argument '-CloudFile="investigate" -CommandLine="-HostId $HostId"' `
+  -SessionId $SessionId -Wait
+```
+
+```powershell Kill Process
+# Kill a process by PID
+Invoke-FalconAdminCommand -Command kill -Argument '1234' -SessionId $SessionId -Wait
+```
+
+```powershell Registry Operations
+# Query registry
+Invoke-FalconAdminCommand -Command 'reg query' `
+  -Argument 'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' `
+  -SessionId $SessionId -Wait
+```
+
+</CodeGroup>
+
+## Batch Command Execution
+
+### Execute Commands Across Multiple Hosts
+
+```powershell
+# Start batch session
+$HostIds = Get-FalconHost -Filter "hostname:'WEB-*'" | Select-Object -ExpandProperty device_id
+$Batch = Start-FalconSession -Id $HostIds
+
+# Execute command on all hosts
+$Results = Invoke-FalconCommand -Command ps `
+  -BatchId $Batch.batch_id `
+  -Timeout 60
+
+# Process results from each host
+foreach ($HostResult in $Results) {
+    Write-Host "Host: $($HostResult.aid)"
+    Write-Host $HostResult.stdout
+    Write-Host "---"
+}
+```
+
+### Batch File Retrieval
+
+```powershell
+# Retrieve file from multiple hosts
+$GetRequest = Invoke-FalconBatchGet -FilePath 'C:\\Logs\\application.log' `
+  -BatchId $BatchId `
+  -Wait
+
+# Check status
+Confirm-FalconGetFile -BatchGetCmdReqId $GetRequest.batch_get_cmd_req_id
+
+# Download files from each host
+foreach ($Host in $GetRequest.hosts) {
+    if ($Host.sha256) {
+        Receive-FalconGetFile -SessionId $Host.session_id `
+          -Sha256 $Host.sha256 `
+          -Path "./evidence/$($Host.aid)_"
+    }
+}
+```
+
+### Target Specific Hosts in Batch
+
+```powershell
+# Execute on subset of batch hosts using OptionalHostId
+$TargetHosts = @('a1b2c3d4...', 'b2c3d4e5...')
+
+Invoke-FalconCommand -Command ls `
+  -Argument 'C:\\Temp' `
+  -BatchId $BatchId `
+  -OptionalHostId $TargetHosts
+```
+
+## Managing RTR Assets
+
+### Put Files
+
+Put files are uploaded to CrowdStrike and can be deployed to hosts:
+
+```powershell
+# Upload a put file
+Send-FalconPutFile -Path './tools/collector.exe' `
+  -Name 'collector' `
+  -Description 'Evidence collector tool' `
+  -Comment 'IR tool for incident 2024-001'
+
+# List put files
+Get-FalconPutFile -Detailed -All
+
+# Download a put file
+Get-FalconPutFile -Filter "name:'collector'" | Receive-FalconPutFile -Path './backup/'
+
+# Delete a put file
+Remove-FalconPutFile -Id 'abc123_def456'
+```
+
+### Custom Scripts
+
+Upload and manage custom scripts for RTR:
+
+```powershell
+# Upload a script
+Send-FalconScript -Path './scripts/memory-dump.ps1' `
+  -Name 'memory-dump' `
+  -Description 'Capture process memory' `
+  -Platform @('windows') `
+  -PermissionType group `
+  -Comment 'Memory forensics script'
+
+# List scripts
+Get-FalconScript -Detailed -All
+
+# Update a script
+Edit-FalconScript -Id 'abc123_def456' `
+  -Path './scripts/memory-dump-v2.ps1' `
+  -Description 'Updated memory capture tool'
+
+# Delete a script
+Remove-FalconScript -Id 'abc123_def456'
+```
+
+### FalconScript Library
+
+CrowdStrike provides pre-built scripts in the FalconScript library:
+
+```powershell
+# List available library scripts
+Get-FalconLibraryScript -Detailed -All
+
+# Find specific script
+Get-FalconLibraryScript -Filter "name:*'network'*" -Detailed
+```
+
+## Session Management
+
+### List Active Sessions
+
+```powershell
+# List all your sessions
+Get-FalconSession -All
+
+# Search sessions by filter
+Get-FalconSession -Filter "created_at:>='now-1h'" -Detailed
+
+# View sessions across entire CID (requires audit permission)
+Get-FalconSession -Cid -Filter "user_id:'api-client-*'" -All
+```
+
+### Queued Sessions
+
+```powershell
+# List queued sessions (for offline hosts)
+Get-FalconSession -Id $SessionId -Queue
+
+# Delete queued command
+Remove-FalconCommand -SessionId $SessionId -CloudRequestId $CommandId
+```
+
+### Close Sessions
+
+```powershell
+# Close a session
+Remove-FalconSession -Id $SessionId
+
+# Clean up batch session
+Remove-FalconSession -Id $BatchId
+```
+
+<Note>
+Sessions automatically timeout after inactivity. Always close sessions when finished to free resources.
+</Note>
+
+## Command Confirmation
+
+Confirm command execution status:
+
+```powershell
+# For read-only commands
+Confirm-FalconCommand -CloudRequestId $Command.cloud_request_id -SequenceId 0
+
+# For active responder commands
+Confirm-FalconResponderCommand -CloudRequestId $Command.cloud_request_id
+
+# For admin commands
+Confirm-FalconAdminCommand -CloudRequestId $Command.cloud_request_id
+```
+
+## Practical Investigation Workflow
+
+<Steps>
+
+<Step title="Identify Suspicious Host">
+```powershell
+$Host = Get-FalconHost -Filter "hostname:'DESKTOP-INFECTED'" -Detailed
+```
+</Step>
+
+<Step title="Start RTR Session">
+```powershell
+$Session = Start-FalconSession -Id $Host.device_id
+$SessionId = $Session.session_id
+```
+</Step>
+
+<Step title="Gather Process Information">
+```powershell
+$Processes = Invoke-FalconCommand -Command ps -SessionId $SessionId -Wait
+Write-Host $Processes.stdout
+```
+</Step>
+
+<Step title="Check Network Connections">
+```powershell
+$Network = Invoke-FalconCommand -Command netstat -SessionId $SessionId -Wait
+Write-Host $Network.stdout
+```
+</Step>
+
+<Step title="Retrieve Suspicious File">
+```powershell
+$File = Invoke-FalconResponderCommand -Command get `
+  -Argument 'C:\\Users\\Public\\malware.exe' `
+  -SessionId $SessionId -Wait
+
+Receive-FalconGetFile -SessionId $SessionId -Sha256 $File.sha256
+```
+</Step>
+
+<Step title="Contain Host">
+```powershell
+Invoke-FalconHostAction -Name contain -Id $Host.device_id
+```
+</Step>
+
+<Step title="Close Session">
+```powershell
+Remove-FalconSession -Id $SessionId
+```
+</Step>
+
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Policies" icon="shield" href="./managing-policies">
+    Configure prevention and response policies
+  </Card>
+  <Card title="Working with Hosts" icon="server" href="./working-with-hosts">
+    Query and organize your host inventory
+  </Card>
+</CardGroup>

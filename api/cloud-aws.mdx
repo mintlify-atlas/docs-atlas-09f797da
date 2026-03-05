@@ -1,0 +1,394 @@
+---
+title: Cloud Security - AWS
+description: Manage AWS cloud account registration and security with CrowdStrike Falcon
+---
+
+## Overview
+
+Manage AWS account registration, configuration, and monitoring for CrowdStrike Falcon Cloud Security (CSPM). These cmdlets enable you to connect AWS accounts, configure cloud trails, enable behavior assessment, and manage security posture across your AWS infrastructure.
+
+## Prerequisites
+
+- **CSPM registration: Read** - Required for retrieval operations
+- **CSPM registration: Write** - Required for account provisioning and modifications
+
+---
+
+## Get-FalconCloudAwsAccount
+
+Search for registered Falcon Cloud Security AWS accounts.
+
+<Note>
+A properly provisioned AWS account will display the status `Event_DiscoverAccountStatusOperational`.
+</Note>
+
+```powershell Get-FalconCloudAwsAccount
+Get-FalconCloudAwsAccount [-Id <string[]>] [-OrganizationId <string[]>] [-ScanType <string>] [-Status <string>] [-GroupBy <string>] [-IamRoleArn <string[]>] [-Migrated <boolean>] [-CspmLite <boolean>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="OrganizationId" type="string[]">
+  AWS organization identifier (format: `o-[0-9a-z]{10,32}`)
+</ParamField>
+
+<ParamField path="ScanType" type="string">
+  Scan type. Valid values: `full`, `dry`
+</ParamField>
+
+<ParamField path="Status" type="string">
+  AWS account status. Valid values: `provisioned`, `operational`
+</ParamField>
+
+<ParamField path="GroupBy" type="string">
+  Field to group by. Valid values: `organization`
+</ParamField>
+
+<ParamField path="IamRoleArn" type="string[]">
+  AWS IAM role ARNs
+</ParamField>
+
+<ParamField path="Migrated" type="boolean">
+  Only return migrated Discover for Cloud accounts
+</ParamField>
+
+<ParamField path="CspmLite" type="boolean">
+  Only return CSPM Lite accounts
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all operational AWS accounts
+Get-FalconCloudAwsAccount -Status operational -All
+
+# Get specific AWS account by ID
+Get-FalconCloudAwsAccount -Id 123456789012
+
+# Get accounts by organization
+Get-FalconCloudAwsAccount -OrganizationId o-abc123def456
+```
+
+---
+
+## New-FalconCloudAwsAccount
+
+Provision a new Falcon Cloud Security AWS account.
+
+```powershell New-FalconCloudAwsAccount
+New-FalconCloudAwsAccount -AccountId <string> -CloudtrailRegion <string> [-OrganizationId <string>] [-AccountType <string>] [-IsMaster <boolean>] [-IamRoleArn <string>] [-UseExistingCloudtrail <boolean>] [-BehaviorAssessmentEnabled <boolean>] [-SensorManagementEnabled <boolean>] [-TargetOu <string[]>] [-DspmEnabled <boolean>] [-DspmRole <string>] [-RootStackId <string>] [-DeploymentMethod <string>] [-ClientId <string>]
+```
+
+### Parameters
+
+<ParamField path="AccountId" type="string" required>
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="CloudtrailRegion" type="string" required>
+  AWS region where the account resides
+</ParamField>
+
+<ParamField path="OrganizationId" type="string">
+  AWS organization identifier (12-digit format)
+</ParamField>
+
+<ParamField path="AccountType" type="string">
+  AWS account type
+</ParamField>
+
+<ParamField path="IsMaster" type="boolean">
+  Master account designation
+</ParamField>
+
+<ParamField path="IamRoleArn" type="string">
+  AWS IAM role ARN
+</ParamField>
+
+<ParamField path="UseExistingCloudtrail" type="boolean">
+  Use existing CloudTrail log
+</ParamField>
+
+<ParamField path="BehaviorAssessmentEnabled" type="boolean">
+  Enable behavior assessment for account
+</ParamField>
+
+<ParamField path="SensorManagementEnabled" type="boolean">
+  Enable sensor management for account
+</ParamField>
+
+<ParamField path="TargetOu" type="string[]">
+  Target organizational units
+</ParamField>
+
+<ParamField path="DspmEnabled" type="boolean">
+  Enable DSPM (Data Security Posture Management)
+</ParamField>
+
+<ParamField path="DspmRole" type="string">
+  DSPM role ARN
+</ParamField>
+
+<ParamField path="RootStackId" type="string">
+  Root Stack ID
+</ParamField>
+
+<ParamField path="DeploymentMethod" type="string">
+  Deployment method
+</ParamField>
+
+<ParamField path="ClientId" type="string">
+  Falcon client ID
+</ParamField>
+
+### Example
+
+```powershell
+# Provision a new AWS account
+New-FalconCloudAwsAccount -AccountId 123456789012 -CloudtrailRegion us-east-1 -BehaviorAssessmentEnabled $true
+
+# Provision with organization
+New-FalconCloudAwsAccount -AccountId 123456789012 -CloudtrailRegion us-west-2 -OrganizationId 987654321098 -IsMaster $true
+```
+
+---
+
+## Edit-FalconCloudAwsAccount
+
+Modify an existing Falcon Cloud Security AWS account.
+
+```powershell Edit-FalconCloudAwsAccount
+Edit-FalconCloudAwsAccount -AccountId <string> [-CloudtrailRegion <string>] [-IamRoleArn <string>] [-BehaviorAssessmentEnabled <boolean>] [-SensorManagementEnabled <boolean>] [-RemediationRegion <string>] [-RemediationTouAccepted <string>] [-Environment <string>] [-TargetOu <string[]>] [-DspmEnabled <boolean>] [-DspmRole <string>] [-RootStackId <string>] [-DeploymentMethod <string>] [-ClientId <string>]
+```
+
+### Parameters
+
+<ParamField path="AccountId" type="string" required>
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="CloudtrailRegion" type="string">
+  AWS region where the account resides
+</ParamField>
+
+<ParamField path="IamRoleArn" type="string">
+  AWS IAM role ARN
+</ParamField>
+
+<ParamField path="BehaviorAssessmentEnabled" type="boolean">
+  Enable behavior assessment for account
+</ParamField>
+
+<ParamField path="SensorManagementEnabled" type="boolean">
+  Enable sensor management for account
+</ParamField>
+
+<ParamField path="RemediationRegion" type="string">
+  Region where remediation occurs
+</ParamField>
+
+<ParamField path="RemediationTouAccepted" type="string">
+  Remediation terms-of-use acceptance date
+</ParamField>
+
+<ParamField path="Environment" type="string">
+  Environment designation
+</ParamField>
+
+<ParamField path="TargetOu" type="string[]">
+  Target organizational units
+</ParamField>
+
+<ParamField path="DspmEnabled" type="boolean">
+  Enable DSPM
+</ParamField>
+
+<ParamField path="DspmRole" type="string">
+  DSPM role ARN
+</ParamField>
+
+<ParamField path="RootStackId" type="string">
+  Root Stack ID
+</ParamField>
+
+<ParamField path="DeploymentMethod" type="string">
+  Deployment method
+</ParamField>
+
+<ParamField path="ClientId" type="string">
+  Falcon client ID
+</ParamField>
+
+### Example
+
+```powershell
+# Enable behavior assessment
+Edit-FalconCloudAwsAccount -AccountId 123456789012 -BehaviorAssessmentEnabled $true
+
+# Update CloudTrail region
+Edit-FalconCloudAwsAccount -AccountId 123456789012 -CloudtrailRegion eu-west-1
+```
+
+---
+
+## Remove-FalconCloudAwsAccount
+
+Remove Falcon Cloud Security AWS accounts.
+
+```powershell Remove-FalconCloudAwsAccount
+Remove-FalconCloudAwsAccount -Id <string[]>
+Remove-FalconCloudAwsAccount -OrganizationId <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="OrganizationId" type="string[]">
+  AWS organization identifier (format: `o-[0-9a-z]{10,32}`)
+</ParamField>
+
+### Example
+
+```powershell
+# Remove specific AWS account
+Remove-FalconCloudAwsAccount -Id 123456789012
+
+# Remove by organization
+Remove-FalconCloudAwsAccount -OrganizationId o-abc123def456
+```
+
+---
+
+## Get-FalconCloudAwsLink
+
+Retrieve a URL to grant Falcon Cloud Security access in AWS.
+
+<Info>
+Once logged into the provided link using your AWS administrator credentials, use the **Create Stack** button to grant access.
+</Info>
+
+```powershell Get-FalconCloudAwsLink
+Get-FalconCloudAwsLink
+```
+
+### Example
+
+```powershell
+# Get AWS registration URL
+$Link = Get-FalconCloudAwsLink
+Start-Process $Link.url
+```
+
+---
+
+## Receive-FalconCloudAwsScript
+
+Download a Bash script which grants Falcon Cloud Security access using the AWS CLI.
+
+```powershell Receive-FalconCloudAwsScript
+Receive-FalconCloudAwsScript [-Id <string[]>] [-OrganizationId <string>] [-Template <string>] [-Account <string[]>] [-AccountType <string>] [-AwsProfile <string>] [-CustomRole <string>] [-BehaviorAssessment <boolean>] [-SensorManagement <boolean>] [-ExistingCloudtrail <boolean>] [-DspmEnabled <boolean>] [-DspmRole <string>] [-DspmRegion <string[]>] -Path <string> [-Force]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  AWS account identifier (12-digit format)
+</ParamField>
+
+<ParamField path="OrganizationId" type="string">
+  AWS organization identifier
+</ParamField>
+
+<ParamField path="Template" type="string">
+  Template to be rendered. Valid values: `aws-bash`, `aws-terraform`
+</ParamField>
+
+<ParamField path="Account" type="string[]">
+  List of AWS accounts to register
+</ParamField>
+
+<ParamField path="AccountType" type="string">
+  Type of account. Valid values: `commercial`, `gov`
+</ParamField>
+
+<ParamField path="AwsProfile" type="string">
+  AWS profile to use during registration
+</ParamField>
+
+<ParamField path="CustomRole" type="string">
+  Custom IAM role to be used during registration
+</ParamField>
+
+<ParamField path="BehaviorAssessment" type="boolean">
+  Enable behavior assessment
+</ParamField>
+
+<ParamField path="SensorManagement" type="boolean">
+  Enable sensor management
+</ParamField>
+
+<ParamField path="ExistingCloudtrail" type="boolean">
+  Use existing CloudTrail
+</ParamField>
+
+<ParamField path="DspmEnabled" type="boolean">
+  Enable DSPM
+</ParamField>
+
+<ParamField path="DspmRole" type="string">
+  DSPM role ARN
+</ParamField>
+
+<ParamField path="DspmRegion" type="string[]">
+  DSPM regions
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Destination path for the script (.sh extension)
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite existing file when present
+</ParamField>
+
+### Example
+
+```powershell
+# Download AWS registration script
+Receive-FalconCloudAwsScript -Path ./aws-register.sh -Template aws-bash -BehaviorAssessment $true
+
+# Download Terraform template
+Receive-FalconCloudAwsScript -Path ./aws-terraform.sh -Template aws-terraform -Account 123456789012
+```
+
+---
+
+## Related Resources
+
+- [Cloud Security - Azure](/api/cloud-azure)
+- [Cloud Security - GCP](/api/cloud-gcp)
+- [Container Security](/api/container-security)
+- [Kubernetes Protection](/api/kubernetes-protection)

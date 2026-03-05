@@ -1,0 +1,410 @@
+---
+title: 'Real-time Response'
+description: 'Session management and read-only command execution for Real-time Response'
+icon: 'terminal'
+---
+
+## Overview
+
+Real-time Response (RTR) enables interactive command execution on CrowdStrike Falcon hosts. This API provides read-only commands for investigating hosts without making changes to the system.
+
+<Note>
+All RTR operations require an active session. Sessions expire after 5 minutes of inactivity unless refreshed.
+</Note>
+
+## Session Management
+
+### Start-FalconSession
+
+Initialize a single-host or batch Real-time Response session.
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s). Use `Get-FalconHost` to retrieve host IDs.
+</ParamField>
+
+<ParamField path="QueueOffline" type="boolean">
+  Add non-responsive hosts to the offline queue for automatic connection when they come online.
+</ParamField>
+
+<ParamField path="ExistingBatchId" type="string">
+  Add hosts to an existing batch session. Must be a valid batch session UUID.
+</ParamField>
+
+<ParamField path="Timeout" type="int32" default="30">
+  Length of time to wait for a result, in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="HostTimeout" type="int32">
+  Length of time to wait for a result from target host(s), in seconds. Valid range: 1-600.
+</ParamField>
+
+**Returns:** Single-host session returns `session_id`, batch session returns `batch_id` and host details.
+
+**Required Permission:** `Real time response: Read`
+
+```powershell Example: Single Host Session
+# Start a session for one host
+$Session = Start-FalconSession -Id '1234567890abcdef1234567890abcdef'
+Write-Host "Session ID: $($Session.session_id)"
+```
+
+```powershell Example: Batch Session
+# Start a batch session for multiple hosts
+$HostIds = @('1234567890abcdef1234567890abcdef', 'fedcba0987654321fedcba0987654321')
+$Batch = Start-FalconSession -Id $HostIds
+Write-Host "Batch ID: $($Batch.batch_id)"
+```
+
+### Get-FalconSession
+
+Search for existing Real-time Response sessions.
+
+<ParamField path="Id" type="string[]">
+  Session identifier(s) to retrieve.
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to filter results (e.g., `"created_at:>'2024-01-01'"`).
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+</ParamField>
+
+<ParamField path="Limit" type="int32" default="100">
+  Maximum number of results per request. Valid range: 1-1000.
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results for pagination.
+</ParamField>
+
+<ParamField path="Cid" type="switch">
+  Expand search to include all sessions created within your environment (requires additional permission).
+</ParamField>
+
+<ParamField path="Queue" type="switch">
+  Restrict search to sessions in the offline queue.
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for each session.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+**Required Permission:** `Real time response: Read` (and `Real time response audit: Read` when using `-Cid`)
+
+```powershell Example: Get Session Details
+# Retrieve session information
+$SessionInfo = Get-FalconSession -Id $Session.session_id -Detailed
+```
+
+### Update-FalconSession
+
+Refresh a session to prevent expiration (extends the 5-minute timeout).
+
+<ParamField path="HostId" type="string">
+  Host identifier for a single-host session.
+</ParamField>
+
+<ParamField path="BatchId" type="string">
+  Batch session identifier.
+</ParamField>
+
+<ParamField path="QueueOffline" type="boolean">
+  Add non-responsive hosts to the offline queue.
+</ParamField>
+
+<ParamField path="HostToRemove" type="string[]">
+  Host identifier(s) to remove from a batch session.
+</ParamField>
+
+<ParamField path="Timeout" type="int32" default="30">
+  Length of time to wait for a result, in seconds. Valid range: 1-600.
+</ParamField>
+
+**Required Permission:** `Real time response: Read`
+
+```powershell Example: Refresh Session
+# Keep session alive during long-running operations
+Update-FalconSession -HostId $Session.aid
+```
+
+### Remove-FalconSession
+
+Terminate an active Real-time Response session.
+
+<ParamField path="Id" type="string" required>
+  Session identifier to remove.
+</ParamField>
+
+**Required Permission:** `Real time response: Read`
+
+```powershell Example: Close Session
+# Always close sessions when done
+Remove-FalconSession -Id $Session.session_id
+```
+
+## Read-Only Commands
+
+### Invoke-FalconCommand
+
+Execute read-only RTR commands that do not modify the host system.
+
+<ParamField path="Command" type="string" required>
+  Real-time Response command to execute. Available commands:
+  - `cat` - Display file contents
+  - `cd` - Change directory
+  - `clear` - Clear screen
+  - `csrutil` - Check System Integrity Protection status (macOS)
+  - `env` - Display environment variables
+  - `eventlog backup` - Backup Windows event logs
+  - `eventlog export` - Export Windows event logs
+  - `eventlog list` - List Windows event logs
+  - `eventlog view` - View Windows event log entries
+  - `filehash` - Calculate file hash
+  - `getsid` - Get security identifier
+  - `help` - Display available commands
+  - `history` - Show command history
+  - `ifconfig` - Display network configuration (Unix/macOS)
+  - `ipconfig` - Display network configuration (Windows)
+  - `ls` - List directory contents
+  - `mount` - Display mounted filesystems
+  - `netstat` - Display network connections
+  - `ps` - List running processes
+  - `reg query` - Query Windows registry
+  - `users` - List logged-in users
+</ParamField>
+
+<ParamField path="Argument" type="string">
+  Arguments to include with the command (e.g., file path, registry key).
+</ParamField>
+
+<ParamField path="SessionId" type="string">
+  Session identifier for single-host execution.
+</ParamField>
+
+<ParamField path="BatchId" type="string">
+  Batch session identifier for multi-host execution.
+</ParamField>
+
+<ParamField path="OptionalHostId" type="string[]">
+  Restrict batch execution to specific host identifiers.
+</ParamField>
+
+<ParamField path="Timeout" type="int32" default="30">
+  Length of time to wait for a result, in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="HostTimeout" type="int32">
+  Length of time to wait for a result from target host(s), in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="Wait" type="switch">
+  Automatically poll for command completion using `Confirm-FalconCommand`.
+</ParamField>
+
+**Required Permission:** `Real time response: Read`
+
+```powershell Example: List Processes
+# Execute 'ps' command and wait for results
+$Result = Invoke-FalconCommand -Command ps -SessionId $Session.session_id -Wait
+Write-Host $Result.stdout
+```
+
+```powershell Example: Check Registry Key
+# Query Windows registry
+$RegCmd = Invoke-FalconCommand -Command 'reg query' `
+  -Argument 'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion' `
+  -SessionId $Session.session_id -Wait
+```
+
+### Confirm-FalconCommand
+
+Verify the status of a read-only command (required to acknowledge command completion).
+
+<Warning>
+Failing to confirm commands can lead to unexpected results. Always confirm commands as part of your workflow.
+</Warning>
+
+<ParamField path="CloudRequestId" type="string" required>
+  Command request identifier returned from `Invoke-FalconCommand`.
+</ParamField>
+
+<ParamField path="SequenceId" type="int32" default="0">
+  Sequence identifier for command ordering.
+</ParamField>
+
+**Required Permission:** `Real time response: Read`
+
+```powershell Example: Manual Confirmation
+# Issue command without -Wait
+$Command = Invoke-FalconCommand -Command ps -SessionId $Session.session_id
+
+# Poll for completion
+do {
+  Start-Sleep -Seconds 2
+  $Status = Confirm-FalconCommand -CloudRequestId $Command.cloud_request_id
+} until ($Status.complete -eq $true)
+
+Write-Host $Status.stdout
+```
+
+### Remove-FalconCommand
+
+Remove a command from a queued Real-time Response session.
+
+<ParamField path="SessionId" type="string" required>
+  Session identifier containing the queued command.
+</ParamField>
+
+<ParamField path="CloudRequestId" type="string" required>
+  Cloud request identifier of the command to remove.
+</ParamField>
+
+**Required Permission:** `Real time response: Read`
+
+```powershell Example: Cancel Queued Command
+# Remove a command from the offline queue
+Remove-FalconCommand -SessionId $Session.session_id -CloudRequestId $Command.cloud_request_id
+```
+
+## Workflow Examples
+
+<Steps>
+  <Step title="Establish Session">
+    Start an RTR session with the target host(s).
+    
+    ```powershell
+    $HostId = (Get-FalconHost -Filter "hostname:'DESKTOP-01'").device_id
+    $Session = Start-FalconSession -Id $HostId
+    ```
+  </Step>
+  
+  <Step title="Execute Commands">
+    Run read-only investigation commands.
+    
+    ```powershell
+    # Check running processes
+    $Processes = Invoke-FalconCommand -Command ps -SessionId $Session.session_id -Wait
+    
+    # List files in suspicious directory
+    $Files = Invoke-FalconCommand -Command ls -Argument 'C:\\Temp' `
+      -SessionId $Session.session_id -Wait
+    
+    # Get file hash
+    $Hash = Invoke-FalconCommand -Command filehash `
+      -Argument 'C:\\Temp\\suspicious.exe' `
+      -SessionId $Session.session_id -Wait
+    ```
+  </Step>
+  
+  <Step title="Review Results">
+    Examine command output for investigation findings.
+    
+    ```powershell
+    Write-Host "Process List:"
+    $Processes.stdout
+    
+    Write-Host "Files Found:"
+    $Files.stdout
+    
+    Write-Host "File Hash:"
+    $Hash.stdout
+    ```
+  </Step>
+  
+  <Step title="Clean Up">
+    Always close sessions to free resources.
+    
+    ```powershell
+    Remove-FalconSession -Id $Session.session_id
+    ```
+  </Step>
+</Steps>
+
+## Batch Session Workflow
+
+```powershell Complete Batch Investigation
+# Investigate multiple hosts simultaneously
+$HostIds = Get-FalconHost -Filter "platform_name:'Windows'+last_seen:>'2024-01-01'" | 
+  Select-Object -ExpandProperty device_id -First 10
+
+# Start batch session
+$Batch = Start-FalconSession -Id $HostIds -QueueOffline $true
+
+# Execute command across all hosts in batch
+$BatchResult = Invoke-FalconCommand -Command netstat `
+  -Argument '-ano' `
+  -BatchId $Batch.batch_id
+
+# Review results for each host
+foreach ($Host in $BatchResult) {
+  Write-Host "Host: $($Host.aid)"
+  if ($Host.stdout) {
+    Write-Host $Host.stdout
+  } elseif ($Host.errors) {
+    Write-Warning "Error: $($Host.errors.message)"
+  }
+}
+
+# Clean up
+Remove-FalconSession -Id $Batch.batch_id
+```
+
+## Best Practices
+
+<Warning>
+**Session Management**
+- Sessions expire after 5 minutes of inactivity
+- Use `Update-FalconSession` to refresh long-running sessions
+- Always close sessions with `Remove-FalconSession` when done
+- Use `QueueOffline` for hosts that may be offline
+</Warning>
+
+<Note>
+**Command Execution**
+- Use the `-Wait` parameter for automatic result polling
+- Always confirm commands to acknowledge completion
+- Batch commands return per-host results
+- Check for errors in command output before proceeding
+</Note>
+
+## Error Handling
+
+```powershell Robust RTR Workflow
+try {
+  # Start session
+  $Session = Start-FalconSession -Id $HostId
+  
+  if ($Session.session_id) {
+    # Execute command with error checking
+    $Result = Invoke-FalconCommand -Command ps `
+      -SessionId $Session.session_id -Wait
+    
+    if ($Result.complete) {
+      # Process results
+      Write-Host $Result.stdout
+    } else {
+      Write-Warning "Command did not complete"
+    }
+  } else {
+    Write-Error "Failed to create session"
+  }
+} catch {
+  Write-Error "RTR Error: $_"
+} finally {
+  # Always clean up session
+  if ($Session.session_id) {
+    Remove-FalconSession -Id $Session.session_id
+  }
+}
+```
+
+## Related APIs
+
+- [RTR Admin](/api/rtr-admin) - Administrative commands with write access
+- [RTR Scripts](/api/rtr-scripts) - Custom script management and execution

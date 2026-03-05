@@ -1,0 +1,404 @@
+---
+title: Falcon Fusion SOAR Workflows
+description: Automate security operations with Falcon Fusion workflows
+---
+
+Falcon Fusion SOAR provides workflow automation capabilities to orchestrate security operations. Create, manage, and execute workflows that integrate Falcon capabilities with third-party tools for automated incident response and threat remediation.
+
+## Workflow Management
+
+### Get-FalconWorkflow
+
+Search for Falcon Fusion SOAR workflows.
+
+```powershell
+# Get all workflows
+Get-FalconWorkflow -All
+
+# Get workflow executions
+Get-FalconWorkflow -Execution -Filter "status:'failed'" -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  Workflow execution identifier(s)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Execution" type="switch">
+  Retrieve information about workflow executions
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Export-FalconWorkflow
+
+Export a Falcon Fusion SOAR workflow to YAML.
+
+```powershell
+Export-FalconWorkflow -Id <workflow_id> -Path "C:\Workflows\myworkflow.yaml"
+```
+
+#### Parameters
+
+<ParamField path="Sanitize" type="boolean">
+  Remove potentially identifiable information before export
+</ParamField>
+
+<ParamField path="Path" type="string">
+  Destination path. If not provided, file created in local directory using workflow identifier
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Workflow identifier
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+### Import-FalconWorkflow
+
+Import a Falcon Fusion SOAR workflow from YAML.
+
+```powershell
+Import-FalconWorkflow -Path "C:\Workflows\incident_response.yaml" -Name "Incident Response Workflow"
+```
+
+#### Parameters
+
+<ParamField path="Name" type="string">
+  Workflow name
+</ParamField>
+
+<ParamField path="ValidateOnly" type="boolean">
+  Validate workflow without creating it
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Path to Falcon Fusion SOAR workflow YAML file
+</ParamField>
+
+### Invoke-FalconWorkflow
+
+Execute an on-demand Falcon Fusion SOAR workflow.
+
+```powershell
+# Execute workflow by ID with trigger data
+$TriggerData = @{
+    detection_id = "ldt:abc123..."
+    severity = "critical"
+} | ConvertTo-Json
+
+Invoke-FalconWorkflow -Id <workflow_id> -Json $TriggerData
+```
+
+#### Parameters
+
+<ParamField path="Cid" type="string[]">
+  Target CID. Child CIDs supported in Flight Control environments
+</ParamField>
+
+<ParamField path="Key" type="string">
+  Optional UUID to help de-duplicate executions
+</ParamField>
+
+<ParamField path="Depth" type="int32">
+  Execution depth limit to prevent loops (1-4)
+</ParamField>
+
+<ParamField path="SourceEventUrl" type="string">
+  Optional source URL for auditing
+</ParamField>
+
+<ParamField path="Json" type="string" required>
+  JSON string defining workflow trigger key/value pairs
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Workflow name (alternative to Id)
+</ParamField>
+
+<ParamField path="Id" type="string[]">
+  Workflow identifier(s)
+</ParamField>
+
+### Redo-FalconWorkflow
+
+Resume or retry a failed Falcon Fusion SOAR workflow execution.
+
+```powershell
+Redo-FalconWorkflow -Id <execution_id>
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Workflow execution identifier(s)
+</ParamField>
+
+## Workflow Actions
+
+### Get-FalconWorkflowAction
+
+Search for Falcon Fusion SOAR workflow actions.
+
+```powershell
+# Get all available workflow actions
+Get-FalconWorkflowAction -All
+
+# Get actions from library
+Get-FalconWorkflowAction -Library -Filter "category:'crowdstrike'" -All
+```
+
+#### Parameters
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Library" type="switch">
+  Retrieve actions from the library
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+## Workflow Triggers
+
+### Get-FalconWorkflowTrigger
+
+Search for Falcon Fusion SOAR workflow triggers.
+
+```powershell
+Get-FalconWorkflowTrigger -Filter "trigger_type:'detection'"
+```
+
+#### Parameters
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+## Human Inputs
+
+### Get-FalconWorkflowInput
+
+Retrieve information about Falcon Fusion SOAR workflow human inputs.
+
+```powershell
+Get-FalconWorkflowInput -Id <input_id>
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Human input identifier(s)
+</ParamField>
+
+## Use Cases
+
+### Automated Detection Response
+
+```powershell
+# Create workflow trigger data for a detection
+$Detection = Get-FalconDetection -Id "ldt:abc123..." | Select-Object -First 1
+
+$TriggerData = @{
+    detection_id = $Detection.detection_id
+    severity = $Detection.severity
+    hostname = $Detection.device.hostname
+    username = $Detection.behaviors[0].user_name
+} | ConvertTo-Json
+
+# Execute incident response workflow
+Invoke-FalconWorkflow -Name "Automated Incident Response" -Json $TriggerData
+```
+
+### Export and Backup Workflows
+
+```powershell
+# Export all workflows for backup
+$Workflows = Get-FalconWorkflow -All
+$BackupPath = "C:\Workflow_Backups\$(Get-Date -Format 'yyyyMMdd')"
+
+New-Item -Path $BackupPath -ItemType Directory -Force | Out-Null
+
+foreach ($Workflow in $Workflows) {
+    $FileName = "$($Workflow.name -replace '[^a-zA-Z0-9_-]','_').yaml"
+    Export-FalconWorkflow -Id $Workflow.id -Path "$BackupPath\$FileName" -Sanitize $true
+    Write-Host "Exported: $($Workflow.name)"
+}
+```
+
+### Workflow Execution Monitoring
+
+```powershell
+# Monitor workflow executions
+$Today = (Get-Date).Date.ToString('yyyy-MM-ddTHH:mm:ssZ')
+$Executions = Get-FalconWorkflow -Execution -Filter "start_timestamp:>'$Today'" -Detailed -All
+
+# Analyze execution status
+$Summary = $Executions | Group-Object -Property status | Select-Object Name, Count
+
+Write-Host "Workflow Execution Summary:"
+$Summary | Format-Table -AutoSize
+
+# Retry failed executions
+$FailedExecutions = $Executions | Where-Object { $_.status -eq 'failed' }
+if ($FailedExecutions) {
+    Write-Host "Found $($FailedExecutions.Count) failed executions"
+    $FailedExecutions | Redo-FalconWorkflow
+}
+```
+
+### Import Custom Workflows
+
+```powershell
+# Validate workflow before import
+$ValidationResult = Import-FalconWorkflow -Path "C:\Workflows\custom_workflow.yaml" -ValidateOnly $true
+
+if ($ValidationResult.valid) {
+    Write-Host "Workflow is valid" -ForegroundColor Green
+    
+    # Import workflow
+    $NewWorkflow = Import-FalconWorkflow -Path "C:\Workflows\custom_workflow.yaml" `
+        -Name "Custom Security Workflow"
+    
+    Write-Host "Imported workflow: $($NewWorkflow.id)"
+} else {
+    Write-Warning "Workflow validation failed: $($ValidationResult.errors)"
+}
+```
+
+### Automated Containment Workflow
+
+```powershell
+# Execute containment workflow for critical detections
+$CriticalDetections = Get-FalconDetection -Filter "severity:'critical'+status:'new'" -Detailed
+
+foreach ($Detection in $CriticalDetections) {
+    $TriggerData = @{
+        detection_id = $Detection.detection_id
+        device_id = $Detection.device.device_id
+        hostname = $Detection.device.hostname
+        action = "contain"
+    } | ConvertTo-Json
+    
+    Write-Host "Executing containment workflow for $($Detection.device.hostname)"
+    Invoke-FalconWorkflow -Name "Host Containment" -Json $TriggerData -Key ([guid]::NewGuid().ToString())
+}
+```
+
+### Workflow Library Management
+
+```powershell
+# List available workflow actions by category
+$Actions = Get-FalconWorkflowAction -Library -All
+
+$ActionsByCategory = $Actions | Group-Object -Property category | ForEach-Object {
+    [PSCustomObject]@{
+        Category = $_.Name
+        Count = $_.Count
+        Actions = ($_.Group | Select-Object -ExpandProperty name) -join ', '
+    }
+}
+
+$ActionsByCategory | Format-Table -AutoSize -Wrap
+```
+
+### Multi-Tenant Workflow Execution
+
+```powershell
+# Execute workflow across multiple child CIDs (Flight Control)
+$ChildCIDs = @('cid1', 'cid2', 'cid3')
+
+$TriggerData = @{
+    task = "security_scan"
+    timestamp = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ssZ')
+} | ConvertTo-Json
+
+# Execute workflow in each child tenant
+Invoke-FalconWorkflow -Id <workflow_id> -Cid $ChildCIDs -Json $TriggerData
+```
+
+### Workflow Execution History
+
+```powershell
+# Generate execution report for specific workflow
+$WorkflowId = "abc123..."
+$Executions = Get-FalconWorkflow -Execution -Filter "definition_id:'$WorkflowId'" -All
+
+$Report = $Executions | Select-Object @{
+    Name = 'ExecutionID'
+    Expression = { $_.execution_id }
+}, @{
+    Name = 'Status'
+    Expression = { $_.status }
+}, @{
+    Name = 'StartTime'
+    Expression = { $_.start_timestamp }
+}, @{
+    Name = 'Duration'
+    Expression = { 
+        if ($_.end_timestamp) {
+            ([datetime]$_.end_timestamp - [datetime]$_.start_timestamp).TotalSeconds
+        } else { 'Running' }
+    }
+}
+
+$Report | Export-Csv -Path "workflow_execution_report.csv" -NoTypeInformation
+```
+
+<Note>
+Requires **Workflow: Read** scope for read operations and **Workflow: Write** scope for executing, importing, and modifying workflows.
+</Note>
+
+<Tip>
+Use the `ValidateOnly` parameter when importing workflows to test YAML syntax and structure before creating the workflow.
+</Tip>
+
+## Related Resources
+
+- [Falcon Fusion SOAR Documentation](https://falcon.crowdstrike.com/documentation/page/fusion-workflows)
+- [Workflow Automation Best Practices](https://www.crowdstrike.com/resources/)
+- [SOAR Use Cases](https://www.crowdstrike.com/cybersecurity-101/security-orchestration-automation-and-response-soar/)

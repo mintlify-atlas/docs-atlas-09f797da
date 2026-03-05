@@ -1,0 +1,561 @@
+---
+title: Container Security
+description: Manage container images, registries, policies, and security assessments with CrowdStrike Falcon
+---
+
+## Overview
+
+Manage container image security, registry integrations, vulnerability assessments, and security policies for Falcon Container Security. These cmdlets enable comprehensive container lifecycle security including image scanning, policy enforcement, registry management, and runtime protection.
+
+## Prerequisites
+
+- **Falcon Container Image: Read** - Required for retrieval operations
+- **Falcon Container Image: Write** - Required for provisioning and modifications
+
+---
+
+## Container Images
+
+### Get-FalconContainerImage
+
+Search for Falcon Cloud Security container images.
+
+```powershell Get-FalconContainerImage
+Get-FalconContainerImage [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-WithConfig <boolean>] [-Offset <int32>] [-All] [-Total]
+```
+
+#### Parameters
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="WithConfig" type="boolean">
+  Include container image configuration detail
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+#### Example
+
+```powershell
+# Get all container images
+Get-FalconContainerImage -All
+
+# Get images with configuration
+Get-FalconContainerImage -WithConfig $true -Limit 100
+
+# Filter by registry
+Get-FalconContainerImage -Filter "registry:'docker.io'" -All
+```
+
+---
+
+### New-FalconContainerImage
+
+Create a Falcon Cloud Security base container image.
+
+```powershell New-FalconContainerImage
+New-FalconContainerImage -ImageId <string> -ImageDigest <string> -Registry <string> -Repository <string> -Tag <string>
+```
+
+#### Parameters
+
+<ParamField path="ImageId" type="string" required>
+  Container image identifier
+</ParamField>
+
+<ParamField path="ImageDigest" type="string" required>
+  Container image digest
+</ParamField>
+
+<ParamField path="Registry" type="string" required>
+  Container registry
+</ParamField>
+
+<ParamField path="Repository" type="string" required>
+  Container repository
+</ParamField>
+
+<ParamField path="Tag" type="string" required>
+  Container tag
+</ParamField>
+
+#### Example
+
+```powershell
+# Create base image
+New-FalconContainerImage -ImageId abc123 -ImageDigest sha256:def456 -Registry docker.io -Repository myorg/myapp -Tag latest
+```
+
+---
+
+### Remove-FalconContainerImage
+
+Remove a Falcon Cloud Security base container image.
+
+```powershell Remove-FalconContainerImage
+Remove-FalconContainerImage -Id <string[]>
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Container image identifier
+</ParamField>
+
+#### Example
+
+```powershell
+# Remove base image
+Remove-FalconContainerImage -Id abc123
+```
+
+---
+
+## Container Registries
+
+### Get-FalconContainerRegistry
+
+List Falcon Cloud Security registries.
+
+```powershell Get-FalconContainerRegistry
+Get-FalconContainerRegistry [-Id <string>] [-Sort <string>] [-Limit <int>] [-Offset <int>] [-Detailed] [-All] [-Total]
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string">
+  Container registry identifier (GUID format)
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request (default: 100, max: 5000)
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+#### Example
+
+```powershell
+# Get all registries
+Get-FalconContainerRegistry -All
+
+# Get specific registry with details
+Get-FalconContainerRegistry -Id 12345678-1234-1234-1234-123456789012 -Detailed
+```
+
+---
+
+### New-FalconContainerRegistry
+
+Create a registry within Falcon Cloud Security.
+
+```powershell New-FalconContainerRegistry
+New-FalconContainerRegistry -Name <string> -Type <string> -Url <string> -Credential <hashtable> [-UrlUniquenessKey <string>]
+```
+
+#### Parameters
+
+<ParamField path="Name" type="string" required>
+  Desired registry name within Falcon Cloud Security
+</ParamField>
+
+<ParamField path="Type" type="string" required>
+  Registry type. Valid values: `acr`, `artifactory`, `docker`, `dockerhub`, `ecr`, `gar`, `gcr`, `github`, `gitlab`, `harbor`, `icr`, `mirantis`, `nexus`, `openshift`, `oracle`, `quay.io`
+</ParamField>
+
+<ParamField path="Url" type="string" required>
+  URL used to log in to the registry
+</ParamField>
+
+<ParamField path="Credential" type="hashtable" required>
+  Hashtable containing username and password used to access the registry
+</ParamField>
+
+<ParamField path="UrlUniquenessKey" type="string">
+  Registry URL alias
+</ParamField>
+
+#### Example
+
+```powershell
+# Create Docker Hub registry
+$Creds = @{ username = 'myuser'; password = 'mypass' }
+New-FalconContainerRegistry -Name 'My Docker Hub' -Type dockerhub -Url https://index.docker.io/v1/ -Credential $Creds
+
+# Create ECR registry
+$AwsCreds = @{ username = 'AWS'; password = '<token>' }
+New-FalconContainerRegistry -Name 'My ECR' -Type ecr -Url 123456789012.dkr.ecr.us-east-1.amazonaws.com -Credential $AwsCreds
+```
+
+---
+
+### Edit-FalconContainerRegistry
+
+Modify a registry within Falcon Cloud Security.
+
+```powershell Edit-FalconContainerRegistry
+Edit-FalconContainerRegistry -Id <string> [-Name <string>] [-State <string>] [-Credential <hashtable>]
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string" required>
+  Container registry identifier (GUID format)
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Falcon Cloud Security registry name
+</ParamField>
+
+<ParamField path="State" type="string">
+  Registry connection state. Valid values: `pause`, `resume`
+</ParamField>
+
+<ParamField path="Credential" type="hashtable">
+  Hashtable containing credentials to access the registry
+</ParamField>
+
+#### Example
+
+```powershell
+# Pause registry scanning
+Edit-FalconContainerRegistry -Id 12345678-1234-1234-1234-123456789012 -State pause
+
+# Update credentials
+$NewCreds = @{ username = 'newuser'; password = 'newpass' }
+Edit-FalconContainerRegistry -Id 12345678-1234-1234-1234-123456789012 -Credential $NewCreds
+```
+
+---
+
+## Container Policies
+
+### Get-FalconContainerPolicy
+
+List Falcon Cloud Security container policies.
+
+```powershell Get-FalconContainerPolicy
+Get-FalconContainerPolicy
+```
+
+#### Example
+
+```powershell
+# Get all container policies
+Get-FalconContainerPolicy
+```
+
+---
+
+### New-FalconContainerPolicy
+
+Create a Falcon Cloud Security container policy.
+
+```powershell New-FalconContainerPolicy
+New-FalconContainerPolicy -Name <string> -Description <string>
+```
+
+#### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="Description" type="string" required>
+  Policy description
+</ParamField>
+
+#### Example
+
+```powershell
+# Create new policy
+New-FalconContainerPolicy -Name 'Production Image Policy' -Description 'Security policy for production container images'
+```
+
+---
+
+### Edit-FalconContainerPolicy
+
+Modify a Falcon Cloud Security container policy.
+
+```powershell Edit-FalconContainerPolicy
+Edit-FalconContainerPolicy -Id <string> -Name <string> -Enabled <boolean> [-Description <string>] [-Rule <hashtable[]>]
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string" required>
+  Image assessment policy identifier (GUID format)
+</ParamField>
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="Enabled" type="boolean" required>
+  Policy enablement status
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Rule" type="hashtable[]">
+  One or more hashtables containing rule "action" and "policy_rules_data"
+</ParamField>
+
+#### Example
+
+```powershell
+# Enable policy
+Edit-FalconContainerPolicy -Id 12345678-1234-1234-1234-123456789012 -Name 'Production Policy' -Enabled $true
+
+# Update with rules
+$Rules = @(@{ action = 'BLOCK'; policy_rules_data = @{ severity = 'CRITICAL' }})
+Edit-FalconContainerPolicy -Id 12345678-1234-1234-1234-123456789012 -Name 'Security Policy' -Enabled $true -Rule $Rules
+```
+
+---
+
+### Remove-FalconContainerPolicy
+
+Delete Image Assessment Policy by policy UUID.
+
+```powershell Remove-FalconContainerPolicy
+Remove-FalconContainerPolicy -Id <string>
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string" required>
+  Image assessment policy identifier (GUID format)
+</ParamField>
+
+#### Example
+
+```powershell
+# Delete policy
+Remove-FalconContainerPolicy -Id 12345678-1234-1234-1234-123456789012
+```
+
+---
+
+## Vulnerability & Assessment
+
+### Get-FalconContainerAssessment
+
+Search for Falcon Container Security image assessment results.
+
+```powershell Get-FalconContainerAssessment
+Get-FalconContainerAssessment [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+#### Parameters
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values include: `first_seen.asc`, `first_seen.desc`, `highest_detection_severity.asc`, `highest_detection_severity.desc`, `highest_vulnerability_severity.asc`, `highest_vulnerability_severity.desc`, `image_digest.asc`, `image_digest.desc`, `registry.asc`, `registry.desc`, `repository.asc`, `repository.desc`, `tag.asc`, `tag.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-100)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+#### Example
+
+```powershell
+# Get all assessments
+Get-FalconContainerAssessment -All
+
+# Get assessments with critical vulnerabilities
+Get-FalconContainerAssessment -Filter "highest_vulnerability_severity:'CRITICAL'" -All
+```
+
+---
+
+### Get-FalconContainerVulnerability
+
+Search for Falcon Cloud Security container image vulnerabilities.
+
+```powershell Get-FalconContainerVulnerability
+Get-FalconContainerVulnerability [-Id <string>] [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string">
+  CVE identifier
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values include: `cps_current_rating.asc`, `cps_current_rating.desc`, `cve_id.asc`, `cve_id.desc`, `cvss_score.asc`, `cvss_score.desc`, `description.asc`, `description.desc`, `images_impacted.asc`, `images_impacted.desc`, `packages_impacted.asc`, `packages_impacted.desc`, `severity.asc`, `severity.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+#### Example
+
+```powershell
+# Get all vulnerabilities
+Get-FalconContainerVulnerability -All
+
+# Get specific CVE
+Get-FalconContainerVulnerability -Id CVE-2023-12345
+
+# Get critical vulnerabilities
+Get-FalconContainerVulnerability -Filter "severity:'CRITICAL'" -Sort cvss_score.desc
+```
+
+---
+
+## Container Runtime
+
+### Get-FalconContainer
+
+Search for containers in Falcon Cloud Security.
+
+```powershell Get-FalconContainer
+Get-FalconContainer [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+#### Parameters
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+#### Example
+
+```powershell
+# Get all running containers
+Get-FalconContainer -All
+
+# Get containers by image
+Get-FalconContainer -Filter "image_digest:'sha256:abc123'" -All
+```
+
+---
+
+### Get-FalconContainerSensor
+
+Retrieve the most recent Falcon container sensor build tags.
+
+```powershell Get-FalconContainerSensor
+Get-FalconContainerSensor [-LatestUrl]
+```
+
+#### Parameters
+
+<ParamField path="LatestUrl" type="switch">
+  Create a URL using the most recent build tag
+</ParamField>
+
+#### Example
+
+```powershell
+# Get sensor tags
+Get-FalconContainerSensor
+
+# Get latest sensor URL
+Get-FalconContainerSensor -LatestUrl
+```
+
+---
+
+## Related Resources
+
+- [Kubernetes Protection](/api/kubernetes-protection)
+- [Cloud Security - AWS](/api/cloud-aws)
+- [Cloud Security - Azure](/api/cloud-azure)
+- [Cloud Security - GCP](/api/cloud-gcp)

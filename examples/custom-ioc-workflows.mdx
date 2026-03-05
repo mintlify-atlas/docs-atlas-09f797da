@@ -1,0 +1,680 @@
+---
+title: Custom IOC Workflows
+description: Create, manage, and automate custom indicators of compromise
+icon: magnifying-glass
+---
+
+Automate the creation, management, and detection of custom indicators of compromise (IOCs) using PSFalcon.
+
+## Understanding Custom IOCs
+
+Custom IOCs allow you to create detection rules for specific indicators like IP addresses, domains, file hashes, and more.
+
+### Supported IOC Types
+
+```powershell
+# Get available IOC types
+$Types = Get-FalconIocType
+$Types
+
+# Common types:
+# - sha256, md5
+# - ipv4, ipv6
+# - domain
+# - url
+```
+
+### Available Actions
+
+```powershell
+# Get available actions
+$Actions = Get-FalconIocAction
+
+# Available actions:
+# - no_action: Monitor only
+# - detect: Create detection
+# - prevent: Block and create detection
+```
+
+## Create Custom IOCs
+
+### Create Single IOC
+
+```powershell
+# Create a hash-based IOC
+$Param = @{
+  Type = 'sha256'
+  Value = 'abcd1234efgh5678ijkl9012mnop3456qrst7890uvwx1234yzab5678cdef9012'
+  Action = 'prevent'
+  Platforms = @('windows', 'mac', 'linux')
+  Severity = 'high'
+  Description = 'Known malware: TrickBot variant'
+  Tags = @('malware', 'trickbot', 'incident-2024-001')
+  AppliedGlobally = $true
+}
+
+$Ioc = New-FalconIoc @Param
+
+if ($Ioc) {
+  Write-Host "Created IOC: $($Ioc.id)"
+  Write-Host "  Type: $($Ioc.type)"
+  Write-Host "  Value: $($Ioc.value)"
+  Write-Host "  Action: $($Ioc.action)"
+}
+```
+
+### Create Multiple IOCs from List
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string[]]$IpAddresses,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('detect', 'prevent', 'no_action', IgnoreCase=$false)]
+  [string]$Action,
+  
+  [Parameter()]
+  [string]$Source = 'Threat Intel'
+)
+
+# Create IOC objects
+$Indicators = @($IpAddresses).foreach{
+  [PSCustomObject]@{
+    type = 'ipv4'
+    value = $_
+    action = $Action
+    platforms = @('windows', 'mac', 'linux')
+    severity = 'medium'
+    source = $Source
+    applied_globally = $true
+    tags = @('threat-intel', 'malicious-ip')
+  }
+}
+
+# Bulk create (up to 1000 at a time)
+Write-Host "Creating $($Indicators.Count) IOCs..."
+$Result = $Indicators | New-FalconIoc
+
+if ($Result) {
+  Write-Host "Created $(@($Result).Count) IOCs successfully"
+  $Result | Select-Object id, type, value, action | Format-Table
+}
+```
+
+## Import IOCs from Threat Intelligence
+
+### Import from CSV File
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('\.csv$')]
+  [ValidateScript({
+    if (Test-Path -Path $_ -PathType Leaf) {
+      $true
+    } else {
+      throw "Cannot find path '$_'"
+    }
+  })]
+  [string]$Path,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('detect', 'prevent', IgnoreCase=$false)]
+  [string]$Action
+)
+
+# Import CSV (expected columns: type, value, description, severity)
+$Import = Import-Csv -Path $Path
+
+if (!$Import.type -or !$Import.value) {
+  throw "CSV must contain 'type' and 'value' columns"
+}
+
+Write-Host "Loaded $($Import.Count) indicators from $Path"
+
+# Validate and create IOCs
+$Created = 0
+$Failed = 0
+
+# Process in batches of 1000
+$BatchSize = 1000
+
+for ($i = 0; $i -lt $Import.Count; $i += $BatchSize) {
+  $Batch = $Import[$i..([Math]::Min($i + $BatchSize - 1, $Import.Count - 1))]
+  
+  # Build indicator objects
+  $Indicators = @($Batch).foreach{
+    [PSCustomObject]@{
+      type = $_.type
+      value = $_.value
+      action = $Action
+      platforms = @('windows', 'mac', 'linux')
+      severity = if ($_.severity) { $_.severity } else { 'medium' }
+      description = if ($_.description) { $_.description } else { "Imported from $Path" }
+      applied_globally = $true
+    }
+  }
+  
+  try {
+    $Result = $Indicators | New-FalconIoc
+    if ($Result) {
+      $Created += @($Result).Count
+      Write-Host "Batch $([Math]::Floor($i/$BatchSize) + 1): Created $(@($Result).Count) IOCs"
+    }
+  } catch {
+    Write-Error "Batch failed: $_"
+    $Failed += $Batch.Count
+  }
+  
+  Start-Sleep -Seconds 2
+}
+
+Write-Host "`nSummary:"
+Write-Host "  Total: $($Import.Count)"
+Write-Host "  Created: $Created"
+Write-Host "  Failed: $Failed"
+```
+
+### Import from External Threat Feed
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$FeedUrl,
+  
+  [Parameter()]
+  [string[]]$Tags = @('threat-feed', 'auto-import')
+)
+
+# Download threat feed
+try {
+  $Response = Invoke-RestMethod -Uri $FeedUrl -Method Get
+} catch {
+  throw "Failed to download threat feed: $_"
+}
+
+# Parse response (assuming newline-delimited IPs)
+$IpAddresses = $Response -split "`n" | Where-Object { $_ -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$' }
+
+Write-Host "Found $($IpAddresses.Count) IP addresses in feed"
+
+# Check for existing IOCs to avoid duplicates
+$Existing = Get-FalconIoc -Filter "type:'ipv4'" -All
+$ExistingValues = @($Existing).foreach{ $_.value }
+
+# Filter out existing IOCs
+$NewIps = $IpAddresses | Where-Object { $_ -notin $ExistingValues }
+
+Write-Host "New IOCs to create: $($NewIps.Count)"
+
+if ($NewIps.Count -eq 0) {
+  Write-Host "No new IOCs to import"
+  return
+}
+
+# Create IOC objects
+$Indicators = @($NewIps).foreach{
+  [PSCustomObject]@{
+    type = 'ipv4'
+    value = $_
+    action = 'detect'
+    platforms = @('windows', 'mac', 'linux')
+    severity = 'medium'
+    source = $FeedUrl
+    description = "Auto-imported from threat feed on $(Get-Date -Format 'yyyy-MM-dd')"
+    tags = $Tags
+    applied_globally = $true
+  }
+}
+
+# Bulk create in batches
+$BatchSize = 1000
+$Created = 0
+
+for ($i = 0; $i -lt $Indicators.Count; $i += $BatchSize) {
+  $Batch = $Indicators[$i..([Math]::Min($i + $BatchSize - 1, $Indicators.Count - 1))]
+  
+  $Result = $Batch | New-FalconIoc
+  if ($Result) {
+    $Created += @($Result).Count
+  }
+  
+  Start-Sleep -Seconds 3
+}
+
+Write-Host "Imported $Created new IOCs from threat feed"
+```
+
+## Manage Existing IOCs
+
+### Search and Filter IOCs
+
+```powershell
+# Get all custom IOCs
+$AllIocs = Get-FalconIoc -Detailed -All
+
+# Get IOCs by type
+$HashIocs = Get-FalconIoc -Filter "type:'sha256'" -Detailed -All
+
+# Get IOCs by action
+$PreventIocs = Get-FalconIoc -Filter "action:'prevent'" -Detailed -All
+
+# Get IOCs by tag
+$MalwareIocs = Get-FalconIoc -Filter "tags:['malware']" -Detailed -All
+
+# Get IOCs created in last 7 days
+$UnixDate = [DateTimeOffset]::Now.AddDays(-7).ToUnixTimeSeconds()
+$RecentIocs = Get-FalconIoc -Filter "created_on:>$UnixDate" -Detailed -All
+
+# Get specific IOC by ID
+$IocId = 'abc123...'
+$Ioc = Get-FalconIoc -Id $IocId
+```
+
+### Update IOC Properties
+
+```powershell
+# Update single IOC action
+$IocId = 'abc123...'
+Edit-FalconIoc -Id $IocId -Action prevent -Severity high
+
+# Update IOC with expiration
+$Expiration = (Get-Date).AddDays(30).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+Edit-FalconIoc -Id $IocId -Expiration $Expiration
+
+# Add tags to existing IOC
+$Ioc = Get-FalconIoc -Id $IocId
+$NewTags = $Ioc.tags + @('reviewed', 'confirmed')
+Edit-FalconIoc -Id $IocId -Tag $NewTags
+
+# Enable retrodetection
+Edit-FalconIoc -Id $IocId -Retrodetect $true -Comment "Enabling retrodetection for incident-2024-001"
+```
+
+### Bulk Update IOCs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Filter,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('detect', 'prevent', 'no_action', IgnoreCase=$false)]
+  [string]$NewAction,
+  
+  [Parameter()]
+  [string[]]$AddTags
+)
+
+# Get IOCs to update
+$Iocs = Get-FalconIoc -Filter $Filter -Detailed -All
+
+if (!$Iocs) {
+  throw "No IOCs found matching filter: $Filter"
+}
+
+Write-Host "Found $($Iocs.Count) IOCs to update"
+
+# Build update objects
+$Updates = @($Iocs).foreach{
+  $UpdateObj = [PSCustomObject]@{
+    id = $_.id
+    action = $NewAction
+  }
+  
+  # Add new tags if specified
+  if ($AddTags) {
+    $UpdateObj | Add-Member -NotePropertyName 'tags' -NotePropertyValue (@($_.tags) + $AddTags | Select-Object -Unique)
+  }
+  
+  $UpdateObj
+}
+
+# Update in batches of 1000
+$BatchSize = 1000
+$Updated = 0
+
+for ($i = 0; $i -lt $Updates.Count; $i += $BatchSize) {
+  $Batch = $Updates[$i..([Math]::Min($i + $BatchSize - 1, $Updates.Count - 1))]
+  
+  $Result = $Batch | Edit-FalconIoc
+  if ($Result) {
+    $Updated += @($Result).Count
+    Write-Host "Updated $Updated of $($Updates.Count) IOCs"
+  }
+  
+  Start-Sleep -Seconds 3
+}
+
+Write-Host "Completed: Updated $Updated IOCs to action '$NewAction'"
+```
+
+## IOC Detection Workflows
+
+### Export Detections with IOC Tags
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "custom_ioc_detections_$(Get-Date -Format FileDateTime).json"
+
+try {
+  # Retrieve all CustomIOC detections
+  $Detection = Get-FalconDetection -Filter "behaviors.display_name:*'CustomIOC'*" -Detailed -All
+  
+  if ($Detection) {
+    # Create search filters for each detected Custom IOC
+    $Filter = @($Detection.behaviors).foreach{
+      "type:'$($_.ioc_type)'+value:'$($_.ioc_value)'"
+    } | Select-Object -Unique
+    
+    # Retrieve IOC details including tags
+    $IocList = @($Filter).foreach{
+      Get-FalconIoc -Filter $_ -Detailed | Select-Object type, value, tags
+    }
+    
+    # Append ioc_tags to relevant detections
+    foreach ($Ioc in $IocList) {
+      ($Detection | Where-Object {
+        $_.behaviors.ioc_type -eq $Ioc.type -and $_.behaviors.ioc_value -eq $Ioc.value
+      }).behaviors | ForEach-Object {
+        $_.PSObject.Properties.Add((New-Object PSNoteProperty('ioc_tags', $Ioc.tags)))
+      }
+    }
+    
+    # Export to JSON
+    $Detection | ConvertTo-Json -Depth 16 | Out-File -FilePath $OutputFile
+    
+    Write-Host "Exported $($Detection.Count) detections with IOC tags"
+    Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+  }
+} catch {
+  throw $_
+}
+```
+
+### Automated IOC Response Workflow
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$IocTag,
+  
+  [Parameter()]
+  [switch]$ContainHosts
+)
+
+# Find all detections with specific IOC tag
+$Detections = Get-FalconDetection -Filter "behaviors.display_name:*'CustomIOC'*" -Detailed -All
+
+if (!$Detections) {
+  Write-Host "No IOC detections found"
+  return
+}
+
+# Get IOCs with the specified tag
+$Iocs = Get-FalconIoc -Filter "tags:['$IocTag']" -Detailed -All
+
+if (!$Iocs) {
+  Write-Host "No IOCs found with tag '$IocTag'"
+  return
+}
+
+Write-Host "Found $($Iocs.Count) IOCs with tag '$IocTag'"
+
+# Filter detections to those matching tagged IOCs
+$MatchedDetections = @($Detections).Where({
+  $Detection = $_
+  $MatchFound = $false
+  
+  foreach ($Behavior in $Detection.behaviors) {
+    foreach ($Ioc in $Iocs) {
+      if ($Behavior.ioc_type -eq $Ioc.type -and $Behavior.ioc_value -eq $Ioc.value) {
+        $MatchFound = $true
+        break
+      }
+    }
+    if ($MatchFound) { break }
+  }
+  
+  $MatchFound
+})
+
+Write-Host "Found $($MatchedDetections.Count) detections matching tagged IOCs"
+
+if ($MatchedDetections.Count -eq 0) {
+  return
+}
+
+# Get unique hosts from detections
+$AffectedHosts = $MatchedDetections.device.device_id | Select-Object -Unique
+
+Write-Host "Affected hosts: $($AffectedHosts.Count)"
+
+# Contain hosts if requested
+if ($ContainHosts) {
+  Write-Host "Containing affected hosts..."
+  $AffectedHosts | Invoke-FalconHostAction -Name contain
+  Write-Host "Containment requested for $($AffectedHosts.Count) hosts"
+}
+
+# Update detections with comment
+foreach ($Detection in $MatchedDetections) {
+  Edit-FalconDetection -Id $Detection.detection_id -Comment "Auto-processed: IOC tag '$IocTag' matched"
+}
+
+Write-Host "Updated $($MatchedDetections.Count) detections with processing comment"
+```
+
+## Custom IOA Rules from IOCs
+
+### Create Network Connection Rules from IP List
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('\.txt$')]
+  [ValidateScript({
+    if (Test-Path -Path $_ -PathType Leaf) {
+      $true
+    } else {
+      throw "Cannot find path '$_'"
+    }
+  })]
+  [string]$Path,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('windows', 'mac', 'linux', IgnoreCase=$false)]
+  [string]$Platform,
+  
+  [Parameter(Mandatory)]
+  [string]$GroupName,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('critical', 'high', 'medium', 'low', 'informational', IgnoreCase=$false)]
+  [string]$Severity,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet(10, 20, 30)]
+  [int32]$DispositionId  # 10: Monitor, 20: Detect, 30: Block
+)
+
+# Import IP addresses
+$Import = Get-Content -Path $Path
+$IpAddresses = @($Import).Where({ $_ -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$' })
+
+if (!$IpAddresses) {
+  throw "No valid IPv4 addresses found in $Path"
+}
+
+Write-Host "Found $($IpAddresses.Count) valid IP addresses"
+
+# Create IOA rule group
+$Group = New-FalconIoaGroup -Name $GroupName -Platform $Platform
+
+if (!$Group.id) {
+  throw "Failed to create IOA rule group"
+}
+
+Write-Host "Created IOA group: $($Group.name) ($($Group.id))"
+
+# Create rules (combine IPs into ranges where possible)
+$Action = switch ($DispositionId) {
+  10 { 'Monitor' }
+  20 { 'Detect' }
+  30 { 'Block' }
+}
+
+$CreatedRules = @()
+
+foreach ($Ip in $IpAddresses) {
+  $EscapedIp = $Ip -replace '\.', '\\.'
+  
+  $Param = @{
+    Name = "$Action $Ip"
+    Description = "Network connection to $Ip"
+    PatternSeverity = $Severity
+    RuleTypeId = 9  # network_connection
+    RuleGroupId = $Group.id
+    DispositionId = $DispositionId
+    FieldValue = @(
+      [PSCustomObject]@{
+        name = 'RemoteIPAddress'
+        label = 'Remote IP Address'
+        type = 'excludable'
+        values = @(@{ label = 'include'; value = $EscapedIp })
+      },
+      [PSCustomObject]@{
+        name = 'RemotePort'
+        label = 'Remote TCP/UDP Port'
+        type = 'excludable'
+        values = @(@{ label = 'include'; value = '.*' })
+      },
+      [PSCustomObject]@{
+        name = 'ConnectionType'
+        label = 'Connection Type'
+        type = 'set'
+        values = @()
+      }
+    )
+  }
+  
+  try {
+    $Rule = New-FalconIoaRule @Param
+    if ($Rule) {
+      Write-Host "Created rule: $($Rule.name)"
+      $CreatedRules += $Rule
+    }
+  } catch {
+    Write-Error "Failed to create rule for $Ip: $_"
+  }
+  
+  # Rate limiting
+  Start-Sleep -Milliseconds 500
+}
+
+# Enable all rules and the group
+if ($CreatedRules) {
+  $Group.rules = $CreatedRules
+  $Group.enabled = $true
+  
+  @($CreatedRules).foreach{
+    $_.enabled = $true
+  }
+  
+  $Group | Edit-FalconIoaRule
+  $Group | Edit-FalconIoaGroup
+  
+  Write-Host "Enabled $($CreatedRules.Count) IOA rules in group '$GroupName'"
+}
+```
+
+<Note>
+  Custom IOCs are evaluated in real-time on endpoints. Large numbers of IOCs can impact endpoint performance. Consider using host groups to scope IOCs to specific systems.
+</Note>
+
+## IOC Lifecycle Management
+
+### Auto-Expire Old IOCs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter()]
+  [int]$DaysOld = 90,
+  
+  [Parameter()]
+  [switch]$RemoveInsteadOfExpire
+)
+
+# Calculate Unix timestamp for cutoff date
+$CutoffDate = [DateTimeOffset]::Now.AddDays(-$DaysOld).ToUnixTimeSeconds()
+
+# Find old IOCs
+$OldIocs = Get-FalconIoc -Filter "created_on:<$CutoffDate" -Detailed -All
+
+if (!$OldIocs) {
+  Write-Host "No IOCs older than $DaysOld days found"
+  return
+}
+
+Write-Host "Found $($OldIocs.Count) IOCs older than $DaysOld days"
+
+if ($RemoveInsteadOfExpire) {
+  # Delete old IOCs
+  $Confirm = Read-Host "Delete $($OldIocs.Count) IOCs? (yes/no)"
+  if ($Confirm -eq 'yes') {
+    @($OldIocs.id) | Remove-FalconIoc
+    Write-Host "Deleted $($OldIocs.Count) old IOCs"
+  }
+} else {
+  # Set to no_action (expire)
+  $Updates = @($OldIocs).foreach{
+    [PSCustomObject]@{
+      id = $_.id
+      action = 'no_action'
+    }
+  }
+  
+  $Updates | Edit-FalconIoc
+  Write-Host "Expired $($OldIocs.Count) old IOCs (set to no_action)"
+}
+```
+
+<Warning>
+  Retrodetection generates detections for historical observations of an indicator. Use carefully as it can create large numbers of detections on production systems.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Detection Management" icon="shield-halved" href="/examples/detection-management">
+    Manage IOC-generated detections
+  </Card>
+  <Card title="Reporting Automation" icon="chart-line" href="/examples/reporting-automation">
+    Generate IOC activity reports
+  </Card>
+</CardGroup>

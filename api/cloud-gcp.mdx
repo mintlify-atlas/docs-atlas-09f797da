@@ -1,0 +1,370 @@
+---
+title: Cloud Security - GCP
+description: Manage GCP cloud account registration and security with CrowdStrike Falcon
+---
+
+## Overview
+
+Manage Google Cloud Platform (GCP) account registration, configuration, and monitoring for CrowdStrike Falcon Cloud Security (CSPM). These cmdlets enable you to connect GCP projects, configure service accounts, and monitor security posture across your GCP infrastructure.
+
+## Prerequisites
+
+- **CSPM registration: Read** - Required for retrieval operations
+- **CSPM registration: Write** - Required for account provisioning and modifications
+
+---
+
+## Get-FalconCloudGcpAccount
+
+Search for registered Falcon Cloud Security GCP accounts.
+
+```powershell Get-FalconCloudGcpAccount
+Get-FalconCloudGcpAccount [-Id <string[]>] [-ParentType <string>] [-ScanType <string>] [-Status <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  GCP resource identifier
+</ParamField>
+
+<ParamField path="ParentType" type="string">
+  GCP hierarchy parent type. Valid values: `Folder`, `Organization`, `Project`
+</ParamField>
+
+<ParamField path="ScanType" type="string">
+  Scan type. Valid values: `dry`, `full`
+</ParamField>
+
+<ParamField path="Status" type="string">
+  Account status. Valid values: `operational`, `provisioned`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (default: 100)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all GCP accounts
+Get-FalconCloudGcpAccount -All
+
+# Get operational projects
+Get-FalconCloudGcpAccount -ParentType Project -Status operational
+
+# Get accounts by organization
+Get-FalconCloudGcpAccount -ParentType Organization
+```
+
+---
+
+## New-FalconCloudGcpAccount
+
+Create a Falcon Cloud Security GCP account.
+
+```powershell New-FalconCloudGcpAccount
+New-FalconCloudGcpAccount [-ParentId <string>] [-ParentType <string>] [-ServiceAccountId <int32>] [-ServiceAccountCondition <hashtable[]>] [-ProjectId <string>] [-ClientId <string>] [-ClientEmail <string>] [-PrivateKeyId <string>] [-PrivateKey <string>]
+```
+
+### Parameters
+
+<ParamField path="ParentId" type="string">
+  Parent identifier
+</ParamField>
+
+<ParamField path="ParentType" type="string">
+  Parent type
+</ParamField>
+
+<ParamField path="ServiceAccountId" type="int32">
+  Service account identifier
+</ParamField>
+
+<ParamField path="ServiceAccountCondition" type="hashtable[]">
+  Service account conditions
+</ParamField>
+
+<ParamField path="ProjectId" type="string">
+  Project identifier
+</ParamField>
+
+<ParamField path="ClientId" type="string">
+  Client identifier
+</ParamField>
+
+<ParamField path="ClientEmail" type="string">
+  Client email
+</ParamField>
+
+<ParamField path="PrivateKeyId" type="string">
+  Private key identifier
+</ParamField>
+
+<ParamField path="PrivateKey" type="string">
+  Private key
+</ParamField>
+
+### Example
+
+```powershell
+# Create GCP account with service account credentials
+New-FalconCloudGcpAccount -ProjectId my-gcp-project -ClientId 123456789 -ClientEmail service@project.iam.gserviceaccount.com -PrivateKeyId abc123 -PrivateKey '-----BEGIN PRIVATE KEY-----...'
+```
+
+---
+
+## Edit-FalconCloudGcpAccount
+
+Modify an existing Falcon Cloud Security GCP account.
+
+```powershell Edit-FalconCloudGcpAccount
+Edit-FalconCloudGcpAccount [-ParentId <string>] [-Environment <string>] [-ServiceAccount <object>]
+```
+
+### Parameters
+
+<ParamField path="ParentId" type="string">
+  GCP parent identifier
+</ParamField>
+
+<ParamField path="Environment" type="string">
+  GCP environment
+</ParamField>
+
+<ParamField path="ServiceAccount" type="object">
+  GCP service account object
+</ParamField>
+
+### Example
+
+```powershell
+# Update GCP account environment
+Edit-FalconCloudGcpAccount -ParentId my-parent-id -Environment production
+```
+
+---
+
+## Remove-FalconCloudGcpAccount
+
+Remove Falcon Cloud Security GCP accounts.
+
+```powershell Remove-FalconCloudGcpAccount
+Remove-FalconCloudGcpAccount -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  GCP resource identifier
+</ParamField>
+
+### Example
+
+```powershell
+# Remove GCP account
+Remove-FalconCloudGcpAccount -Id my-gcp-project-id
+```
+
+---
+
+## Get-FalconCloudGcpServiceAccount
+
+Retrieve service account and email information for a Falcon Cloud Security GCP service account.
+
+```powershell Get-FalconCloudGcpServiceAccount
+Get-FalconCloudGcpServiceAccount -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  GCP service account identifier
+</ParamField>
+
+### Example
+
+```powershell
+# Get service account details
+Get-FalconCloudGcpServiceAccount -Id my-service-account-id
+```
+
+---
+
+## Edit-FalconCloudGcpServiceAccount
+
+Modify a Falcon Cloud Security GCP service account.
+
+```powershell Edit-FalconCloudGcpServiceAccount
+Edit-FalconCloudGcpServiceAccount -ServiceAccountId <int32> -ServiceAccountCondition <hashtable[]> -ProjectId <string> -ClientId <string> -ClientEmail <string> -PrivateKeyId <string> -PrivateKey <string>
+```
+
+### Parameters
+
+<ParamField path="ServiceAccountId" type="int32" required>
+  Service account identifier
+</ParamField>
+
+<ParamField path="ServiceAccountCondition" type="hashtable[]" required>
+  Service account conditions
+</ParamField>
+
+<ParamField path="ProjectId" type="string" required>
+  Project identifier
+</ParamField>
+
+<ParamField path="ClientId" type="string" required>
+  Client identifier
+</ParamField>
+
+<ParamField path="ClientEmail" type="string" required>
+  Client email
+</ParamField>
+
+<ParamField path="PrivateKeyId" type="string" required>
+  Private key identifier
+</ParamField>
+
+<ParamField path="PrivateKey" type="string" required>
+  Private key
+</ParamField>
+
+### Example
+
+```powershell
+# Update service account
+Edit-FalconCloudGcpServiceAccount -ServiceAccountId 12345 -ProjectId my-project -ClientId 123456789 -ClientEmail service@project.iam.gserviceaccount.com -PrivateKeyId abc123 -PrivateKey '-----BEGIN PRIVATE KEY-----...'
+```
+
+---
+
+## Test-FalconCloudGcpServiceAccount
+
+Validate the credentials for a Falcon Cloud Security GCP service account.
+
+```powershell Test-FalconCloudGcpServiceAccount
+Test-FalconCloudGcpServiceAccount -ServiceAccountId <int32> -ServiceAccountCondition <hashtable[]> -ProjectId <string> -ClientId <string> -ClientEmail <string> -PrivateKeyId <string> -PrivateKey <string>
+```
+
+### Parameters
+
+<ParamField path="ServiceAccountId" type="int32" required>
+  Service account identifier
+</ParamField>
+
+<ParamField path="ServiceAccountCondition" type="hashtable[]" required>
+  Service account conditions
+</ParamField>
+
+<ParamField path="ProjectId" type="string" required>
+  Project identifier
+</ParamField>
+
+<ParamField path="ClientId" type="string" required>
+  Client identifier
+</ParamField>
+
+<ParamField path="ClientEmail" type="string" required>
+  Client email
+</ParamField>
+
+<ParamField path="PrivateKeyId" type="string" required>
+  Private key identifier
+</ParamField>
+
+<ParamField path="PrivateKey" type="string" required>
+  Private key
+</ParamField>
+
+### Example
+
+```powershell
+# Validate service account credentials
+Test-FalconCloudGcpServiceAccount -ServiceAccountId 12345 -ProjectId my-project -ClientId 123456789 -ClientEmail service@project.iam.gserviceaccount.com -PrivateKeyId abc123 -PrivateKey '-----BEGIN PRIVATE KEY-----...'
+```
+
+---
+
+## Invoke-FalconCloudGcpHealthCheck
+
+Perform a synchronous health check for a Falcon Cloud Security GCP parent account.
+
+```powershell Invoke-FalconCloudGcpHealthCheck
+Invoke-FalconCloudGcpHealthCheck [-ParentId <string>]
+```
+
+### Parameters
+
+<ParamField path="ParentId" type="string">
+  GCP parent account identifier
+</ParamField>
+
+### Example
+
+```powershell
+# Run health check
+Invoke-FalconCloudGcpHealthCheck -ParentId my-parent-id
+```
+
+---
+
+## Receive-FalconCloudGcpScript
+
+Download a Bash script which grants Falcon Cloud Security access using Google Cloud Shell.
+
+```powershell Receive-FalconCloudGcpScript
+Receive-FalconCloudGcpScript [-Id <string[]>] [-ParentType <string>] -Path <string> [-Force]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  GCP resource identifier
+</ParamField>
+
+<ParamField path="ParentType" type="string">
+  GCP hierarchy parent type. Valid values: `Folder`, `Organization`, `Project`
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Destination path for the script (.sh extension)
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite existing file when present
+</ParamField>
+
+### Example
+
+```powershell
+# Download GCP registration script
+Receive-FalconCloudGcpScript -Path ./gcp-register.sh -ParentType Project -Id my-project-id
+
+# Download for organization
+Receive-FalconCloudGcpScript -Path ./gcp-org.sh -ParentType Organization
+```
+
+---
+
+## Related Resources
+
+- [Cloud Security - AWS](/api/cloud-aws)
+- [Cloud Security - Azure](/api/cloud-azure)
+- [Container Security](/api/container-security)
+- [Kubernetes Protection](/api/kubernetes-protection)

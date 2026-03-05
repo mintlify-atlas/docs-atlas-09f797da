@@ -1,0 +1,217 @@
+---
+title: API Reference Overview
+description: Understanding PSFalcon module structure, naming conventions, and common parameters
+---
+
+## Module Structure
+
+PSFalcon v2.2.9 is organized around CrowdStrike Falcon API service categories, with cmdlets grouped by functionality:
+
+<CardGroup cols={2}>
+  <Card title="OAuth2 & Authentication" icon="key">
+    Token management and authentication
+  </Card>
+  <Card title="Host & Device Management" icon="desktop">
+    Host groups, device control, and grouping tags
+  </Card>
+  <Card title="Prevention & Response" icon="shield">
+    Prevention policies, response policies, and IOA rules
+  </Card>
+  <Card title="Real-Time Response" icon="terminal">
+    Interactive command sessions and remote actions
+  </Card>
+  <Card title="Detection & Incidents" icon="bell">
+    Alerts, detections, behaviors, and incident management
+  </Card>
+  <Card title="Threat Intelligence" icon="binoculars">
+    Actors, indicators, malware families, and reports
+  </Card>
+  <Card title="Cloud Security" icon="cloud">
+    AWS, Azure, GCP account management and posture
+  </Card>
+  <Card title="Container Security" icon="cube">
+    Container policies, images, registries, and vulnerabilities
+  </Card>
+</CardGroup>
+
+## Naming Conventions
+
+PSFalcon follows PowerShell best practices with consistent verb-noun patterns:
+
+### Standard Verbs
+
+| Verb | Purpose | Example |
+|------|---------|---------|
+| `Get-` | Retrieve resources | `Get-FalconHost`, `Get-FalconAlert` |
+| `New-` | Create new resources | `New-FalconHostGroup`, `New-FalconIoc` |
+| `Edit-` | Modify existing resources | `Edit-FalconHostGroup`, `Edit-FalconUser` |
+| `Remove-` | Delete resources | `Remove-FalconHostGroup`, `Remove-FalconIoc` |
+| `Invoke-` | Perform actions | `Invoke-FalconHostAction`, `Invoke-FalconRtr` |
+| `Request-` | Request credentials/tokens | `Request-FalconToken` |
+| `Revoke-` | Revoke credentials/tokens | `Revoke-FalconToken` |
+| `Start-` | Start operations | `Start-FalconSession`, `Start-FalconScan` |
+| `Stop-` | Stop operations | `Stop-FalconScan`, `Stop-FalconMigration` |
+| `Send-` | Upload files/data | `Send-FalconSample`, `Send-FalconPutFile` |
+| `Receive-` | Download files/data | `Receive-FalconInstaller`, `Receive-FalconArtifact` |
+
+### Noun Structure
+
+All cmdlets use the `Falcon` prefix followed by the resource type:
+
+```
+[Verb]-Falcon[Resource][Qualifier]
+```
+
+**Examples:**
+- `Get-FalconHost` - Get host information
+- `Get-FalconHostGroup` - Get host group information
+- `Get-FalconHostGroupMember` - Get host group membership
+- `New-FalconIoaExclusion` - Create IOA exclusion
+- `Edit-FalconFirewallPolicy` - Modify firewall policy
+
+## Common Parameters
+
+PSFalcon cmdlets share common parameter patterns for consistency:
+
+### Identifiers
+
+<ParamField path="Id" type="string or array">
+  Resource identifier(s), typically 32-character hexadecimal values
+  
+  **Pattern:** `^[a-fA-F0-9]{32}$`
+  
+  **Aliases:** `ids`, `device_id`, `device_ids`, `host_ids`, etc.
+</ParamField>
+
+### Filtering & Search
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  **Example:** `"hostname:'DESKTOP-*'+platform_name:'Windows'"`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  **Format:** `property_name.asc` or `property_name.desc`
+  
+  **Example:** `"last_seen.desc"`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+  Maximum number of results per request
+  
+  **Default:** Varies by cmdlet (typically 100 or 500)
+  
+  **Maximum:** Varies by API endpoint (typically 5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+  Position to begin retrieving results for pagination
+  
+  **Default:** `0`
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Retrieve all available results using automatic pagination
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information instead of identifier-only results
+</ParamField>
+
+### Common Properties
+
+<ParamField path="Name" type="string">
+  Resource name (policies, groups, etc.)
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Resource description
+</ParamField>
+
+### PowerShell Features
+
+All cmdlets support standard PowerShell features:
+
+- **Pipeline support:** Most cmdlets accept pipeline input via `ValueFromPipeline` or `ValueFromPipelineByPropertyName`
+- **Parameter validation:** Built-in validation for patterns, sets, and custom scripts
+- **ShouldProcess:** Many modification cmdlets support `-WhatIf` and `-Confirm`
+- **Progress indicators:** Long-running operations display progress
+
+## API Credential Caching
+
+PSFalcon caches your API credentials and token after successful authentication:
+
+**Cached Information:**
+- `ClientId` - OAuth2 client identifier
+- `ClientSecret` - OAuth2 client secret  
+- `Hostname` - CrowdStrike API hostname/cloud
+- `MemberCid` - Member CID for multi-CID environments
+- `Expiration` - Token expiration timestamp
+
+The module automatically requests a new token when the current token expires in less than 240 seconds.
+
+## Error Handling
+
+PSFalcon cmdlets return detailed error information:
+
+<CodeGroup>
+```powershell Standard Error
+try {
+    Get-FalconHost -Id 'invalid'
+} catch {
+    Write-Host "Error: $($_.Exception.Message)"
+    Write-Host "Status: $($_.CategoryInfo.Category)"
+}
+```
+
+```powershell Checking API Response
+$Result = Get-FalconHost -Filter "hostname:'DESKTOP-01'"
+if ($Result) {
+    Write-Host "Found: $($Result.hostname)"
+} else {
+    Write-Host "No hosts found"
+}
+```
+</CodeGroup>
+
+## Module Information
+
+<ResponseField name="ModuleVersion" type="string">
+  2.2.9
+</ResponseField>
+
+<ResponseField name="Author" type="string">
+  Brendan Kremian
+</ResponseField>
+
+<ResponseField name="Company" type="string">
+  CrowdStrike
+</ResponseField>
+
+<ResponseField name="PowerShellVersion" type="string">
+  5.1 minimum required
+</ResponseField>
+
+<ResponseField name="CompatiblePSEditions" type="array">
+  Desktop, Core (cross-platform support)
+</ResponseField>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OAuth2 Authentication" icon="key" href="/api/oauth2">
+    Learn how to authenticate and manage tokens
+  </Card>
+  <Card title="Host Management" icon="desktop" href="/api/devices">
+    Manage hosts, groups, and device actions
+  </Card>
+  <Card title="Real-Time Response" icon="terminal" href="/api/real-time-response">
+    Execute commands on remote hosts
+  </Card>
+  <Card title="Prevention Policies" icon="shield" href="/api/prevention">
+    Configure prevention and response policies
+  </Card>
+</CardGroup>

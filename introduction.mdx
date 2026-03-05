@@ -1,0 +1,106 @@
+---
+title: Introduction
+description: PowerShell for the CrowdStrike Falcon OAuth2 APIs
+---
+
+## What is PSFalcon?
+
+PSFalcon is a PowerShell module that helps CrowdStrike Falcon users interact with the CrowdStrike Falcon OAuth2 APIs without having extensive knowledge of APIs or PowerShell. PSFalcon simplifies automation and enables you to perform actions outside of the Falcon UI.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Comprehensive API Coverage" icon="puzzle-piece">
+    Access 700+ cmdlets covering all major Falcon APIs including hosts, detections, incidents, policies, and more
+  </Card>
+  <Card title="Cross-Platform Support" icon="desktop">
+    Works on Windows (PowerShell 5.1+), Linux, and macOS (PowerShell 6+)
+  </Card>
+  <Card title="OAuth2 Authentication" icon="lock">
+    Secure authentication with automatic token refresh and credential caching
+  </Card>
+  <Card title="Real-time Response" icon="bolt">
+    Execute Real-time Response commands across multiple hosts simultaneously
+  </Card>
+</CardGroup>
+
+## What You Can Do
+
+PSFalcon helps you automate tasks and streamline workflows:
+
+- **Bulk Operations**: Modify large numbers of detections, incidents, policies, or rules in a single script
+- **Real-time Response**: Perform actions on many devices simultaneously using RTR cmdlets
+- **File Operations**: Upload or download malware samples and Real-time Response files
+- **Multi-CID Management**: Create and modify configurations for MSSP parent and child environments
+- **Custom Reporting**: Generate reports and export data in formats that suit your needs
+- **Integration**: Build workflows that integrate Falcon with your existing tools and processes
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Security Operations">
+    Automate detection triage, incident response workflows, and threat hunting activities across your environment.
+  </Accordion>
+  <Accordion title="Policy Management">
+    Deploy and manage prevention policies, sensor update policies, and firewall rules at scale.
+  </Accordion>
+  <Accordion title="Asset Management">
+    Query and report on host information, sensor versions, and deployment status across your fleet.
+  </Accordion>
+  <Accordion title="MSSP Operations">
+    Manage multiple customer environments efficiently with Falcon Flight Control (multi-CID) support.
+  </Accordion>
+</AccordionGroup>
+
+## Requirements
+
+Before you begin, ensure you have:
+
+<Steps>
+  <Step title="Active Falcon Subscription">
+    An active CrowdStrike Falcon subscription with access to the modules you need
+  </Step>
+  <Step title="PowerShell Environment">
+    - **Windows**: PowerShell 5.1 or later
+    - **Linux/macOS**: PowerShell 6 or later
+  </Step>
+  <Step title="API Credentials">
+    A Falcon [OAuth2 API Client](https://falcon.crowdstrike.com/support/api-clients-and-keys) with appropriate roles and permissions
+  </Step>
+</Steps>
+
+<Note>
+  API credentials are created in the Falcon console under **Support and resources > API Clients and Keys**. Ensure your API client has the necessary scopes for the operations you plan to perform.
+</Note>
+
+## Module Information
+
+- **Version**: 2.2.9
+- **Author**: Brendan Kremian
+- **Company**: CrowdStrike
+- **PowerShell Editions**: Desktop, Core
+- **License**: [View License](https://github.com/crowdstrike/psfalcon/blob/master/LICENSE)
+
+## Getting Help
+
+Need assistance?
+
+- Visit the [PSFalcon Wiki](https://github.com/CrowdStrike/psfalcon/wiki) for detailed documentation
+- Check out [example scripts](https://github.com/CrowdStrike/psfalcon/tree/master/samples) in the repository
+- Review the [API documentation](https://assets.falcon.crowdstrike.com/support/api/swagger.html) for endpoint details
+- Report issues on [GitHub](https://github.com/CrowdStrike/psfalcon/issues)
+
+<Tip>
+  All PSFalcon cmdlets follow PowerShell naming conventions with the `Falcon` prefix (e.g., `Get-FalconHost`, `New-FalconHostGroup`). Use `Get-Command -Module PSFalcon` to see all available cmdlets.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install PSFalcon from the PowerShell Gallery
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with your first PSFalcon script
+  </Card>
+</CardGroup>

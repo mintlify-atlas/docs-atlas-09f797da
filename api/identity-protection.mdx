@@ -1,0 +1,661 @@
+---
+title: Identity Protection
+description: Configure identity-based threat detection and response with Falcon Identity Protection
+icon: fingerprint
+---
+
+## Overview
+
+Falcon Identity Protection provides real-time detection and response capabilities for identity-based threats. You can create custom policy rules to detect suspicious authentication patterns, configure automated responses, query identity data using GraphQL, and monitor devices enrolled in identity protection.
+
+<Info>
+Identity Protection operations require various **Identity Protection** permissions depending on the specific action.
+</Info>
+
+## GraphQL Interface
+
+### Execute GraphQL Queries
+
+Interact with Falcon Identity using the GraphQL API for advanced queries and data retrieval.
+
+```powershell Basic GraphQL Query
+$Query = @'
+query {
+  entities(type: "user", archived: false, first: 10) {
+    nodes {
+      entityId
+      primaryDisplayName
+      secondaryDisplayName
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+'@
+
+Invoke-FalconIdentityGraph -String $Query
+```
+
+```powershell Query with Variables
+$Query = @'
+query GetUserEvents($userId: String!, $after: Cursor) {
+  timeline(scope: "user", id: $userId, first: 50, after: $after) {
+    nodes {
+      timestamp
+      eventType
+      description
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+'@
+
+$Variables = @{
+  userId = 'S-1-5-21-1234567890-1234567890-1234567890-1001'
+}
+
+Invoke-FalconIdentityGraph -String $Query -Variable $Variables
+```
+
+```powershell Paginate Through All Results
+$Query = @'
+query GetAllUsers($after: Cursor) {
+  entities(type: "user", archived: false, first: 100, after: $after) {
+    nodes {
+      entityId
+      primaryDisplayName
+      riskScore
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+'@
+
+Invoke-FalconIdentityGraph -String $Query -All
+```
+
+<ParamField path="String" type="string" required>
+Complete GraphQL statement (query or mutation)
+</ParamField>
+
+<ParamField path="Variable" type="hashtable">
+Hashtable containing variables referenced in your GraphQL statement
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved. Requires your GraphQL statement to include an 'after' cursor variable definition and `pageInfo { hasNextPage endCursor }`.
+</ParamField>
+
+<Note>
+Requires **Identity Protection GraphQL: Write** permission, plus additional Identity Protection permissions depending on the query scope.
+</Note>
+
+### GraphQL Best Practices
+
+<Steps>
+  <Step title="Use Pagination">
+    Always include `pageInfo { hasNextPage endCursor }` for queries that return multiple results.
+  </Step>
+  <Step title="Define Variables">
+    Use GraphQL variables instead of string interpolation for dynamic queries to prevent injection issues.
+  </Step>
+  <Step title="Limit Result Sets">
+    Specify a reasonable `first` value (e.g., 100-500) to avoid overwhelming responses.
+  </Step>
+  <Step title="Request Only Needed Fields">
+    Query only the fields you need to reduce response size and improve performance.
+  </Step>
+</Steps>
+
+## Identity Hosts
+
+### Get Identity Hosts
+
+Retrieve information about devices enrolled in Falcon Identity Protection.
+
+```powershell List All Identity Hosts
+Get-FalconIdentityHost -Detailed
+```
+
+```powershell Filter by Domain
+Get-FalconIdentityHost -Filter "domain_name:'contoso.local'" -Detailed
+```
+
+```powershell Get Specific Host
+Get-FalconIdentityHost -Id 'abcdef1234567890abcdef1234567890'
+```
+
+```powershell High-Risk Hosts
+Get-FalconIdentityHost -Filter "risk_score:>=70" -Sort 'risk_score|desc' -Detailed
+```
+
+<ParamField path="Id" type="string[]">
+Device identifier(s) - 32-character hexadecimal string
+</ParamField>
+
+<ParamField path="Filter" type="string">
+Falcon Query Language expression to filter results. Common filters:
+- `domain_name:'example.local'` - Filter by domain
+- `risk_score:>=50` - Filter by risk score
+- `hostname:'DC-*'` - Filter by hostname pattern
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-200)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count instead of results
+</ParamField>
+
+## Policy Rules
+
+### Get Policy Rules
+
+Retrieve Falcon Identity Protection policy rules.
+
+```powershell List All Rules
+Get-FalconIdentityRule -Detailed
+```
+
+```powershell Get by Name
+Get-FalconIdentityRule -Name 'Block Suspicious Access' -Detailed
+```
+
+```powershell Get Enabled Rules Only
+Get-FalconIdentityRule -Enabled $true -Detailed
+```
+
+```powershell Get Rules in Simulation Mode
+Get-FalconIdentityRule -SimulationMode $true -Detailed
+```
+
+```powershell Get Specific Rule
+Get-FalconIdentityRule -Id 'rule-12345678-1234-1234-1234-123456789012'
+```
+
+<ParamField path="Id" type="string[]">
+Policy rule identifier(s)
+</ParamField>
+
+<ParamField path="Name" type="string">
+Filter by rule name
+</ParamField>
+
+<ParamField path="Enabled" type="boolean">
+Filter by enablement status: `$true` or `$false`
+</ParamField>
+
+<ParamField path="SimulationMode" type="boolean">
+Filter by simulation mode: `$true` or `$false`
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+### Create Policy Rules
+
+Create custom identity protection rules to detect and respond to threats.
+
+```powershell Block High-Risk Access
+$Activity = @{
+  accessType = @('kerberos', 'ntlm')
+}
+
+$SourceEndpoint = @{
+  groupMembership = @('high-risk-devices')
+}
+
+New-FalconIdentityRule `
+  -Name 'Block High-Risk Device Access' `
+  -Action 'BLOCK' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -Activity $Activity `
+  -SourceEndpoint $SourceEndpoint
+```
+
+```powershell MFA for Sensitive Access
+$Destination = @{
+  groupMembership = @('domain-admins', 'enterprise-admins')
+}
+
+New-FalconIdentityRule `
+  -Name 'Require MFA for Admin Access' `
+  -Action 'MFA' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -Destination $Destination
+```
+
+```powershell Alert on Suspicious Login
+$SourceUser = @{
+  entityId = @('S-1-5-21-1234567890-1234567890-1234567890-1001')
+}
+
+New-FalconIdentityRule `
+  -Name 'Watch VIP User Access' `
+  -Action 'ADD_TO_WATCH_LIST' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -SourceUser $SourceUser
+```
+
+```powershell Force Password Change on Alert
+New-FalconIdentityRule `
+  -Name 'Force Password Reset on Compromise Alert' `
+  -Action 'FORCE_PASSWORD_CHANGE' `
+  -Trigger 'alert' `
+  -Enabled $true `
+  -SimulationMode $false
+```
+
+```powershell Simulation Mode Rule
+New-FalconIdentityRule `
+  -Name 'Test SSO Policy' `
+  -Action 'APPLY_SSO_POLICY' `
+  -Trigger 'federatedAccess' `
+  -Enabled $true `
+  -SimulationMode $true
+```
+
+<ParamField path="Name" type="string" required>
+Descriptive rule name
+</ParamField>
+
+<ParamField path="Action" type="string" required>
+Action to take when rule triggers:
+- `ADD_TO_WATCH_LIST` - Monitor and generate alerts
+- `ALLOW` - Explicitly permit the activity
+- `APPLY_SSO_POLICY` - Apply SSO policy
+- `BLOCK` - Block the activity
+- `FORCE_PASSWORD_CHANGE` - Require password reset
+- `MFA` - Require multi-factor authentication
+</ParamField>
+
+<ParamField path="Trigger" type="string" required>
+Event type that activates the rule:
+- `access` - Authentication/access events
+- `accountEvent` - Account changes (creation, modification)
+- `alert` - Security alerts
+- `federatedAccess` - Federated/SSO access events
+</ParamField>
+
+<ParamField path="Enabled" type="boolean" required>
+Whether the rule is active: `$true` or `$false`
+</ParamField>
+
+<ParamField path="SimulationMode" type="boolean" required>
+Run in simulation mode (log only, no action): `$true` or `$false`
+</ParamField>
+
+<ParamField path="Activity" type="object">
+Hashtable defining activity-based conditions:
+- `accessType` - Array of access types: `'kerberos'`, `'ntlm'`, `'ldap'`, etc.
+- `accessTypeCustom` - Custom access type string
+</ParamField>
+
+<ParamField path="Destination" type="object">
+Hashtable defining destination-based conditions:
+- `entityId` - Array of destination entity IDs (SIDs, hostnames)
+- `groupMembership` - Array of group names
+</ParamField>
+
+<ParamField path="SourceEndpoint" type="object">
+Hashtable defining source endpoint conditions:
+- `entityId` - Array of device IDs or hostnames
+- `groupMembership` - Array of device group names
+</ParamField>
+
+<ParamField path="SourceUser" type="object">
+Hashtable defining source user conditions:
+- `entityId` - Array of user SIDs or usernames
+- `groupMembership` - Array of user group names
+</ParamField>
+
+<Note>
+Requires **Identity Protection Policy Rules: Write** permission.
+</Note>
+
+### Remove Policy Rules
+
+Delete identity protection rules.
+
+```powershell Remove Rule
+Remove-FalconIdentityRule -Id 'rule-12345678-1234-1234-1234-123456789012'
+```
+
+```powershell Remove Multiple Rules
+Remove-FalconIdentityRule -Id @('rule-12345678-1234-1234-1234-123456789012', 'rule-23456789-2345-2345-2345-234567890123')
+```
+
+<ParamField path="Id" type="string[]" required>
+Policy rule identifier(s) to remove
+</ParamField>
+
+<Warning>
+Removing a policy rule is permanent and immediately stops its enforcement. Ensure you have proper authorization before deleting rules.
+</Warning>
+
+## Common Use Cases
+
+### Protect Privileged Accounts
+
+```powershell Privileged Account Protection
+# MFA for Domain Admin Access
+$AdminGroups = @{
+  groupMembership = @('domain-admins', 'enterprise-admins', 'schema-admins')
+}
+
+New-FalconIdentityRule `
+  -Name 'MFA Required for Privileged Groups' `
+  -Action 'MFA' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -Destination $AdminGroups
+
+# Block access from high-risk endpoints
+$HighRiskEndpoints = @{
+  groupMembership = @('quarantined-devices', 'unmanaged-devices')
+}
+
+$PrivilegedDestination = @{
+  groupMembership = @('domain-controllers', 'sensitive-servers')
+}
+
+New-FalconIdentityRule `
+  -Name 'Block Risky Endpoint to Sensitive Access' `
+  -Action 'BLOCK' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -SourceEndpoint $HighRiskEndpoints `
+  -Destination $PrivilegedDestination
+```
+
+### Monitor VIP Users
+
+```powershell VIP User Monitoring
+# Get VIP user SIDs
+$VipUsers = @{
+  entityId = @(
+    'S-1-5-21-1234567890-1234567890-1234567890-1001',  # CEO
+    'S-1-5-21-1234567890-1234567890-1234567890-1002',  # CFO
+    'S-1-5-21-1234567890-1234567890-1234567890-1003'   # CTO
+  )
+}
+
+New-FalconIdentityRule `
+  -Name 'Monitor VIP User Activity' `
+  -Action 'ADD_TO_WATCH_LIST' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -SourceUser $VipUsers
+
+# Force password change on alert for VIP users
+New-FalconIdentityRule `
+  -Name 'VIP Compromise Response' `
+  -Action 'FORCE_PASSWORD_CHANGE' `
+  -Trigger 'alert' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -SourceUser $VipUsers
+```
+
+### Conditional Access by Protocol
+
+```powershell Protocol-Based Access Control
+# Allow only Kerberos for sensitive systems
+$ModernAuth = @{
+  accessType = @('kerberos')
+}
+
+$SensitiveServers = @{
+  groupMembership = @('finance-servers', 'hr-systems')
+}
+
+New-FalconIdentityRule `
+  -Name 'Require Kerberos for Sensitive Systems' `
+  -Action 'ALLOW' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -Activity $ModernAuth `
+  -Destination $SensitiveServers
+
+# Block legacy NTLM to critical infrastructure
+$LegacyAuth = @{
+  accessType = @('ntlm')
+}
+
+$CriticalInfra = @{
+  groupMembership = @('domain-controllers', 'certificate-authorities')
+}
+
+New-FalconIdentityRule `
+  -Name 'Block NTLM to Critical Infrastructure' `
+  -Action 'BLOCK' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -Activity $LegacyAuth `
+  -Destination $CriticalInfra
+```
+
+### Investigation Workflow
+
+```powershell Identity Threat Investigation
+# Step 1: Find high-risk hosts
+$HighRiskHosts = Get-FalconIdentityHost -Filter "risk_score:>=80" -Detailed
+
+# Step 2: Get user activity on high-risk host
+$Query = @'
+query GetHostActivity($hostId: String!, $after: Cursor) {
+  timeline(scope: "device", id: $hostId, first: 100, after: $after) {
+    nodes {
+      timestamp
+      eventType
+      user {
+        primaryDisplayName
+        riskScore
+      }
+      description
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+'@
+
+foreach ($Host in $HighRiskHosts[0..4]) {
+  $Variables = @{ hostId = $Host.device_id }
+  $Activity = Invoke-FalconIdentityGraph -String $Query -Variable $Variables -All
+  
+  # Analyze activity
+  $SuspiciousActivity = $Activity | Where-Object { $_.user.riskScore -ge 70 }
+  
+  if ($SuspiciousActivity) {
+    Write-Host "High-risk activity detected on $($Host.hostname)"
+    $SuspiciousActivity | Format-Table timestamp, eventType, user.primaryDisplayName, description
+  }
+}
+
+# Step 3: Create monitoring rule for suspicious users
+$SuspiciousUserIds = $SuspiciousActivity.user | Select-Object -Unique -ExpandProperty entityId
+
+$WatchUsers = @{
+  entityId = $SuspiciousUserIds
+}
+
+New-FalconIdentityRule `
+  -Name 'Monitor Suspicious Users from Investigation' `
+  -Action 'ADD_TO_WATCH_LIST' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $false `
+  -SourceUser $WatchUsers
+```
+
+## Testing Rules with Simulation Mode
+
+Before enforcing rules in production, test them in simulation mode:
+
+```powershell Safe Rule Testing
+# Create rule in simulation mode
+$TestRule = New-FalconIdentityRule `
+  -Name 'TEST - Block NTLM Authentication' `
+  -Action 'BLOCK' `
+  -Trigger 'access' `
+  -Enabled $true `
+  -SimulationMode $true `
+  -Activity @{ accessType = @('ntlm') }
+
+# Monitor for 1 week, check impact
+Start-Sleep -Seconds (7 * 24 * 60 * 60)
+
+# Query simulated events via GraphQL
+$Query = @'
+query GetSimulationEvents {
+  entities(type: "idpPolicyRule", archived: false) {
+    nodes {
+      entityId
+      primaryDisplayName
+      simulationMode
+      matchCount
+    }
+  }
+}
+'@
+
+$Results = Invoke-FalconIdentityGraph -String $Query
+
+# If simulation looks good, disable simulation mode
+# (Note: This would require an Edit cmdlet not shown in source)
+```
+
+<Info>
+Simulation mode logs rule matches without taking action, allowing you to validate rule logic before enforcement.
+</Info>
+
+## Best Practices
+
+<Steps>
+  <Step title="Start with Simulation">
+    Always create new rules in simulation mode initially to validate behavior before enforcement.
+  </Step>
+  <Step title="Use Specific Conditions">
+    Define precise conditions using entity IDs and group membership to avoid overly broad rules.
+  </Step>
+  <Step title="Layer Defenses">
+    Combine multiple rules with different actions (monitor, MFA, block) for defense in depth.
+  </Step>
+  <Step title="Monitor Rule Effectiveness">
+    Use GraphQL queries to track rule matches and adjust as needed.
+  </Step>
+  <Step title="Document Rule Purpose">
+    Use descriptive names that clearly indicate the rule's intent and scope.
+  </Step>
+  <Step title="Regular Review">
+    Periodically review rules with `Get-FalconIdentityRule -Detailed` to ensure they remain relevant.
+  </Step>
+</Steps>
+
+## GraphQL Schema Examples
+
+<AccordionGroup>
+  <Accordion title="Query User Risk Score">
+    ```graphql
+    query GetUserRisk($userId: String!) {
+      entities(type: "user", id: $userId) {
+        nodes {
+          entityId
+          primaryDisplayName
+          riskScore
+          riskScoreDescription
+          riskFactors
+        }
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Get Authentication Timeline">
+    ```graphql
+    query GetAuthTimeline($userId: String!, $after: Cursor) {
+      timeline(scope: "user", id: $userId, first: 100, after: $after) {
+        nodes {
+          timestamp
+          eventType
+          sourceEndpoint {
+            primaryDisplayName
+          }
+          destination {
+            primaryDisplayName
+          }
+          protocol
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+    ```
+  </Accordion>
+  <Accordion title="Find Compromised Accounts">
+    ```graphql
+    query GetCompromisedAccounts {
+      entities(type: "user", archived: false, first: 1000) {
+        nodes {
+          entityId
+          primaryDisplayName
+          riskScore
+          compromised
+          lastSeenTimestamp
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<Card title="User Management" icon="users" href="/api/user-management">
+  Manage user accounts and role assignments
+</Card>
+
+<Card title="MSSP Management" icon="building" href="/api/mssp">
+  Configure multi-tenant access with Flight Control
+</Card>

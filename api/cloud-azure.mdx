@@ -1,0 +1,370 @@
+---
+title: Cloud Security - Azure
+description: Manage Azure cloud account registration and security with CrowdStrike Falcon
+---
+
+## Overview
+
+Manage Azure subscription and tenant registration, configuration, and monitoring for CrowdStrike Falcon Cloud Security (CSPM). These cmdlets enable you to connect Azure tenants, configure subscriptions, manage certificates, and monitor security posture across your Azure infrastructure.
+
+## Prerequisites
+
+- **CSPM registration: Read** - Required for retrieval operations
+- **CSPM registration: Write** - Required for account provisioning and modifications
+
+---
+
+## Get-FalconCloudAzureAccount
+
+Search for registered Falcon Cloud Security Azure accounts.
+
+```powershell Get-FalconCloudAzureAccount
+Get-FalconCloudAzureAccount [-Id <string[]>] [-TenantId <string[]>] [-ScanType <string>] [-Status <string>] [-CspmLite <boolean>] [-Limit <int32>] [-Offset <int32>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+<ParamField path="TenantId" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="ScanType" type="string">
+  Scan type. Valid values: `full`, `dry`
+</ParamField>
+
+<ParamField path="Status" type="string">
+  Azure account status. Valid values: `provisioned`, `operational`
+</ParamField>
+
+<ParamField path="CspmLite" type="boolean">
+  Only return CSPM Lite accounts
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all Azure accounts
+Get-FalconCloudAzureAccount -All
+
+# Get operational accounts
+Get-FalconCloudAzureAccount -Status operational
+
+# Get accounts by tenant
+Get-FalconCloudAzureAccount -TenantId 12345678-1234-1234-1234-123456789012
+```
+
+---
+
+## New-FalconCloudAzureAccount
+
+Provision a new Falcon Cloud Security Azure account.
+
+```powershell New-FalconCloudAzureAccount
+New-FalconCloudAzureAccount [-SubscriptionId <string>] [-TenantId <string>] [-ClientId <string>] [-AccountType <string>] [-DefaultSubscription <boolean>] [-YearsValid <int>]
+```
+
+### Parameters
+
+<ParamField path="SubscriptionId" type="string">
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+<ParamField path="TenantId" type="string">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="ClientId" type="string">
+  Azure client identifier
+</ParamField>
+
+<ParamField path="AccountType" type="string">
+  Azure account type
+</ParamField>
+
+<ParamField path="DefaultSubscription" type="boolean">
+  Account is the default Azure subscription
+</ParamField>
+
+<ParamField path="YearsValid" type="int">
+  Number of years certificate is valid
+</ParamField>
+
+### Example
+
+```powershell
+# Provision new Azure account
+New-FalconCloudAzureAccount -SubscriptionId 12345678-1234-1234-1234-123456789012 -TenantId 87654321-4321-4321-4321-210987654321
+
+# Provision as default subscription
+New-FalconCloudAzureAccount -SubscriptionId 12345678-1234-1234-1234-123456789012 -DefaultSubscription $true
+```
+
+---
+
+## Edit-FalconCloudAzureAccount
+
+Modify the default Falcon Cloud Security Azure client or subscription identifier.
+
+<Note>
+Tenant ID is required when multiple tenants have been registered.
+</Note>
+
+```powershell Edit-FalconCloudAzureAccount
+Edit-FalconCloudAzureAccount -Id <string> [-TenantId <string>]
+Edit-FalconCloudAzureAccount -SubscriptionId <string> [-TenantId <string>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string">
+  Azure client identifier (GUID format)
+</ParamField>
+
+<ParamField path="SubscriptionId" type="string">
+  Azure subscription identifier (GUID format)
+</ParamField>
+
+<ParamField path="TenantId" type="string">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Update client ID
+Edit-FalconCloudAzureAccount -Id 11111111-1111-1111-1111-111111111111 -TenantId 22222222-2222-2222-2222-222222222222
+
+# Update default subscription
+Edit-FalconCloudAzureAccount -SubscriptionId 33333333-3333-3333-3333-333333333333
+```
+
+---
+
+## Remove-FalconCloudAzureAccount
+
+Remove Falcon Cloud Security Azure accounts.
+
+```powershell Remove-FalconCloudAzureAccount
+Remove-FalconCloudAzureAccount -Id <string[]> [-TenantId <string[]>] [-RetainTenant <boolean>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Azure account identifier (GUID format)
+</ParamField>
+
+<ParamField path="TenantId" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="RetainTenant" type="boolean">
+  Retain Azure tenant when removing an account
+</ParamField>
+
+### Example
+
+```powershell
+# Remove Azure account
+Remove-FalconCloudAzureAccount -Id 12345678-1234-1234-1234-123456789012
+
+# Remove and retain tenant
+Remove-FalconCloudAzureAccount -Id 12345678-1234-1234-1234-123456789012 -RetainTenant $true
+```
+
+---
+
+## Get-FalconCloudAzureCertificate
+
+Retrieve the base64 encoded certificate for a Falcon Cloud Security Azure tenant.
+
+```powershell Get-FalconCloudAzureCertificate
+Get-FalconCloudAzureCertificate -TenantId <string[]> [-Refresh <boolean>] [-YearsValid <string>]
+```
+
+### Parameters
+
+<ParamField path="TenantId" type="string[]" required>
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="Refresh" type="boolean">
+  Refresh certificate (default: false)
+</ParamField>
+
+<ParamField path="YearsValid" type="string">
+  Years the certificate should be valid (required when Refresh is true)
+</ParamField>
+
+### Example
+
+```powershell
+# Get certificate for tenant
+Get-FalconCloudAzureCertificate -TenantId 12345678-1234-1234-1234-123456789012
+
+# Refresh certificate
+Get-FalconCloudAzureCertificate -TenantId 12345678-1234-1234-1234-123456789012 -Refresh $true -YearsValid 5
+```
+
+---
+
+## Get-FalconCloudAzureGroup
+
+Retrieve Falcon Cloud Security Azure management group registration.
+
+```powershell Get-FalconCloudAzureGroup
+Get-FalconCloudAzureGroup [-TenantId <string[]>] [-Limit <int32>] [-Offset <int32>]
+```
+
+### Parameters
+
+<ParamField path="TenantId" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (default: 100)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+### Example
+
+```powershell
+# Get all management groups
+Get-FalconCloudAzureGroup
+
+# Get by tenant
+Get-FalconCloudAzureGroup -TenantId 12345678-1234-1234-1234-123456789012
+```
+
+---
+
+## New-FalconCloudAzureGroup
+
+Create a Falcon Cloud Security Azure management group.
+
+```powershell New-FalconCloudAzureGroup
+New-FalconCloudAzureGroup [-DefaultSubscriptionId <string>] [-TenantId <string>]
+```
+
+### Parameters
+
+<ParamField path="DefaultSubscriptionId" type="string">
+  Default Azure subscription identifier (GUID format)
+</ParamField>
+
+<ParamField path="TenantId" type="string">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Create management group
+New-FalconCloudAzureGroup -TenantId 12345678-1234-1234-1234-123456789012 -DefaultSubscriptionId 87654321-4321-4321-4321-210987654321
+```
+
+---
+
+## Remove-FalconCloudAzureGroup
+
+Remove Falcon Cloud Security Azure management groups.
+
+```powershell Remove-FalconCloudAzureGroup
+Remove-FalconCloudAzureGroup [-TenantId <string[]>]
+```
+
+### Parameters
+
+<ParamField path="TenantId" type="string[]">
+  Azure tenant identifier (GUID format)
+</ParamField>
+
+### Example
+
+```powershell
+# Remove management group
+Remove-FalconCloudAzureGroup -TenantId 12345678-1234-1234-1234-123456789012
+```
+
+---
+
+## Receive-FalconCloudAzureScript
+
+Download a Bash script which grants Falcon Cloud Security access using Azure Cloud Shell.
+
+```powershell Receive-FalconCloudAzureScript
+Receive-FalconCloudAzureScript [-TenantId <string>] [-SubscriptionId <string[]>] [-Template <string>] [-AccountType <string>] [-AzureManagementGroup <boolean>] -Path <string> [-Force]
+```
+
+### Parameters
+
+<ParamField path="TenantId" type="string">
+  Azure tenant identifier (default: most recently registered, GUID format)
+</ParamField>
+
+<ParamField path="SubscriptionId" type="string[]">
+  Azure subscription identifier (default: all, GUID format)
+</ParamField>
+
+<ParamField path="Template" type="string">
+  Template to be rendered
+</ParamField>
+
+<ParamField path="AccountType" type="string">
+  Account type. Valid values: `commercial`, `gov`
+</ParamField>
+
+<ParamField path="AzureManagementGroup" type="boolean">
+  Use Azure Management Group
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Destination path for the script (.sh extension)
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite existing file when present
+</ParamField>
+
+### Example
+
+```powershell
+# Download Azure registration script
+Receive-FalconCloudAzureScript -Path ./azure-register.sh -TenantId 12345678-1234-1234-1234-123456789012
+
+# Download for management group
+Receive-FalconCloudAzureScript -Path ./azure-mgmt.sh -AzureManagementGroup $true
+```
+
+---
+
+## Related Resources
+
+- [Cloud Security - AWS](/api/cloud-aws)
+- [Cloud Security - GCP](/api/cloud-gcp)
+- [Container Security](/api/container-security)
+- [Kubernetes Protection](/api/kubernetes-protection)

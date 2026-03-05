@@ -1,0 +1,580 @@
+---
+title: "Falcon Intelligence"
+description: "Search and retrieve threat intelligence from CrowdStrike Falcon Intelligence"
+---
+
+Manage threat intelligence including actors, reports, indicators, vulnerabilities, malware families, and detection rules.
+
+## Cmdlets
+
+### Get-FalconActor
+
+Search for Falcon Intelligence threat actors.
+
+**Permissions**: `Actors (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Threat actor identifier
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values:
+  - `name|asc`, `name|desc`
+  - `target_countries|asc`, `target_countries|desc`
+  - `target_industries|asc`, `target_industries|desc`
+  - `type|asc`, `type|desc`
+  - `created_date|asc`, `created_date|desc`
+  - `last_activity_date|asc`, `last_activity_date|desc`
+  - `last_modified_date|asc`, `last_modified_date|desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Field" type="string[]">
+  Specific fields to return, or a predefined collection name surrounded by two underscores [default: __basic__]
+</ParamField>
+
+<ParamField path="Include" type="string">
+  Include additional information. Valid values: `tactic_and_technique`
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Search for actors targeting specific countries
+Get-FalconActor -Filter "target_countries:'US'" -Detailed
+
+# Get detailed information for a specific actor
+Get-FalconActor -Id 'BEAR-001' -Field name,description,target_countries
+
+# Search for actors with MITRE ATT&CK tactics and techniques
+Get-FalconActor -Filter "type:'nation_state'" -Include tactic_and_technique -Detailed
+```
+
+---
+
+### Get-FalconAttck
+
+Search for MITRE ATT&CK tactic and technique information related to specific actors.
+
+**Permissions**: `Actors (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Tactic and technique identifier, by actor
+</ParamField>
+
+<ParamField path="Slug" type="string">
+  Actor identifier ('slug')
+</ParamField>
+
+```powershell Example
+# Get MITRE ATT&CK tactics and techniques for an actor
+Get-FalconAttck -Slug 'fancy-bear'
+```
+
+---
+
+### Get-FalconCve
+
+Search for Falcon Intelligence CVE reports.
+
+**Permissions**: `Vulnerabilities (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  CVE identifier
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Search for recent CVEs
+Get-FalconCve -Filter "created_date:>'2024-01-01'" -Detailed
+
+# Get details for a specific CVE
+Get-FalconCve -Id 'CVE-2024-1234'
+
+# Search for high severity vulnerabilities
+Get-FalconCve -Filter "severity:'HIGH'" -All
+```
+
+---
+
+### Get-FalconIndicator
+
+Search for Falcon Intelligence indicators.
+
+**Permissions**: `Indicators (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Indicator identifier
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values:
+  - `id|asc`, `id|desc`
+  - `indicator|asc`, `indicator|desc`
+  - `type|asc`, `type|desc`
+  - `published_date|asc`, `published_date|desc`
+  - `last_updated|asc`, `last_updated|desc`
+  - `_marker|asc`, `_marker|desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="IncludeDeleted" type="boolean">
+  Include previously deleted indicators
+</ParamField>
+
+<ParamField path="IncludeRelation" type="boolean">
+  Include related indicators
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Search for malicious IP indicators
+Get-FalconIndicator -Filter "type:'ip_address'" -Detailed
+
+# Get indicators published in the last 7 days
+Get-FalconIndicator -Filter "published_date:>'now-7d'" -IncludeRelation $true
+
+# Search for domain indicators
+Get-FalconIndicator -Query 'malicious-domain.com' -All
+```
+
+---
+
+### Get-FalconIntel
+
+Search for Falcon Intelligence reports.
+
+**Permissions**: `Reports (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Report identifier
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values:
+  - `name|asc`, `name|desc`
+  - `target_countries|asc`, `target_countries|desc`
+  - `target_industries|asc`, `target_industries|desc`
+  - `type|asc`, `type|desc`
+  - `created_date|asc`, `created_date|desc`
+  - `last_modified_date|asc`, `last_modified_date|desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Field" type="string[]">
+  Specific fields, or a predefined collection name surrounded by two underscores [default: __basic__]
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Search for recent intelligence reports
+Get-FalconIntel -Filter "created_date:>'2024-01-01'" -Detailed
+
+# Get a specific report
+Get-FalconIntel -Id 'CSIT-12345'
+
+# Search for reports targeting healthcare industry
+Get-FalconIntel -Filter "target_industries:'Healthcare'" -All
+```
+
+---
+
+### Get-FalconMalwareFamily
+
+Search for Falcon Intelligence malware families.
+
+**Permissions**: `Malware Families (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Malware family identifier
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Field" type="string[]">
+  Specific fields to return
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Mitre" type="switch">
+  Retrieve MITRE TTP information for malware families
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Search for ransomware families
+Get-FalconMalwareFamily -Filter "family_type:'ransomware'" -Detailed
+
+# Get MITRE TTPs for a malware family
+Get-FalconMalwareFamily -Id 'emotet' -Mitre
+```
+
+---
+
+### Get-FalconRule
+
+Search for Falcon Intelligence rulesets.
+
+**Permissions**: `Rules (Falcon Intelligence): Read`
+
+<ParamField path="Id" type="string[]">
+  Ruleset identifier
+</ParamField>
+
+<ParamField path="Type" type="string" required>
+  Ruleset type. Valid values:
+  - `common-event-format`
+  - `cql-changelog`, `cql-master`, `cql-update`
+  - `netwitness`
+  - `snort-suricata-changelog`, `snort-suricata-master`, `snort-suricata-update`
+  - `yara-changelog`, `yara-master`, `yara-update`
+</ParamField>
+
+<ParamField path="Name" type="string[]">
+  Ruleset name
+</ParamField>
+
+<ParamField path="Description" type="string[]">
+  Ruleset description
+</ParamField>
+
+<ParamField path="Tag" type="string[]">
+  Ruleset tag
+</ParamField>
+
+<ParamField path="MinCreatedDate" type="int32">
+  Filter results to those created on or after a date
+</ParamField>
+
+<ParamField path="MaxCreatedDate" type="string">
+  Filter results to those created on or before a date
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Get YARA master ruleset
+Get-FalconRule -Type yara-master -Detailed
+
+# Get Snort/Suricata rules from the last 30 days
+Get-FalconRule -Type snort-suricata-changelog -MinCreatedDate (Get-Date).AddDays(-30).ToFileTimeUtc()
+
+# Search for specific rule by tag
+Get-FalconRule -Type yara-master -Tag 'ransomware'
+```
+
+---
+
+### Receive-FalconAttck
+
+Download MITRE ATT&CK information for an actor.
+
+**Permissions**: `Actors (Falcon Intelligence): Read`
+
+<ParamField path="Format" type="string">
+  Export format. Valid values: `csv`, `json` [default: json]
+</ParamField>
+
+<ParamField path="Path" type="string">
+  Destination path (default: ./slug.format)
+</ParamField>
+
+<ParamField path="Slug" type="string" required>
+  Actor identifier
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download actor ATT&CK data as JSON
+Receive-FalconAttck -Slug 'fancy-bear' -Path './actor-ttps.json'
+
+# Download as CSV format
+Receive-FalconAttck -Slug 'fancy-bear' -Format csv -Path './actor-ttps.csv' -Force
+```
+
+---
+
+### Receive-FalconIntel
+
+Download a Falcon Intelligence report.
+
+**Permissions**: `Reports (Falcon Intelligence): Read`
+
+<ParamField path="Path" type="string">
+  Destination path (default: slug.pdf)
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Report identifier
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download an intelligence report
+Receive-FalconIntel -Id 'CSIT-12345' -Path './threat-report.pdf'
+
+# Download and overwrite existing file
+Receive-FalconIntel -Id 'CSIT-12345' -Path './report.pdf' -Force
+```
+
+---
+
+### Receive-FalconMalwareFamilyAttck
+
+Download MITRE ATT&CK information for a malware family.
+
+**Permissions**: `Malware Families (Falcon Intelligence): Read`
+
+<ParamField path="Format" type="string">
+  Export format. Valid values: `CSV`, `JSON`, `JSON_NAVIGATOR` [default: JSON]
+</ParamField>
+
+<ParamField path="Path" type="string">
+  Destination path (default: ./slug.format)
+</ParamField>
+
+<ParamField path="Slug" type="string" required>
+  Malware family identifier
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download malware family ATT&CK data
+Receive-FalconMalwareFamilyAttck -Slug 'emotet' -Path './emotet-ttps.json'
+
+# Download as CSV
+Receive-FalconMalwareFamilyAttck -Slug 'emotet' -Format CSV -Path './emotet.csv'
+```
+
+---
+
+### Receive-FalconRule
+
+Download the most recent or a specific Falcon Intelligence ruleset.
+
+**Permissions**: `Rules (Falcon Intelligence): Read`
+
+<ParamField path="Type" type="string">
+  Ruleset type, used to retrieve the latest ruleset. Valid values:
+  - `common-event-format`
+  - `cql-changelog`, `cql-master`, `cql-update`
+  - `netwitness`
+  - `snort-suricata-changelog`, `snort-suricata-master`, `snort-suricata-update`
+  - `yara-changelog`, `yara-master`, `yara-update`
+</ParamField>
+
+<ParamField path="IfNoneMatch" type="string">
+  Download the latest rule set only if it doesn't have a matching 'tags' value
+</ParamField>
+
+<ParamField path="IfModifiedSince" type="string">
+  Restrict results to those modified after a provided date (HTTP, ANSIC or RFC850 format)
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Destination path (must end with .gz, .gzip, or .zip)
+</ParamField>
+
+<ParamField path="Id" type="int32">
+  Ruleset identifier, used for a specific ruleset
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download latest YARA master ruleset
+Receive-FalconRule -Type yara-master -Path './yara-rules.zip'
+
+# Download specific ruleset by ID
+Receive-FalconRule -Id 12345 -Path './ruleset.zip'
+
+# Download only if modified
+Receive-FalconRule -Type snort-suricata-master -Path './snort.zip' -IfModifiedSince 'Mon, 01 Jan 2024 00:00:00 GMT'
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="IOC Management" icon="crosshairs" href="/api/iocs">
+    Manage custom indicators of compromise
+  </Card>
+  <Card title="MalQuery" icon="magnifying-glass-chart" href="/api/malquery">
+    Hunt for malware samples using YARA
+  </Card>
+  <Card title="Sandbox Analysis" icon="flask" href="/api/falconx">
+    Submit and analyze files in Falcon Sandbox
+  </Card>
+</CardGroup>

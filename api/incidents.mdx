@@ -1,0 +1,398 @@
+---
+title: Incidents
+description: Search for and manage incidents and behaviors in CrowdStrike Falcon
+---
+
+## Get-FalconBehavior
+
+Search for behaviors associated with incidents.
+
+**Required Permission:** `Incidents: Read`
+
+### Syntax
+
+```powershell
+# Search for behaviors
+Get-FalconBehavior [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] 
+  [-Detailed] [-All] [-Total]
+
+# Get specific behaviors by ID
+Get-FalconBehavior -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Behavior identifier(s). Can be provided via pipeline.
+  
+  **Pattern:** `^ind:[a-fA-F0-9]{32}:(\d|\-)+$`
+  
+  **Aliases:** `ids`, `behavior_id`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+  
+  **Valid values:** `timestamp.asc`, `timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request.
+  
+  **Range:** 1-500
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results (used for pagination).
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for behaviors.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Search behaviors
+# Get all behaviors sorted by timestamp
+Get-FalconBehavior -Sort timestamp.desc -All
+
+# Get behaviors with specific filter
+Get-FalconBehavior -Filter "severity:'high'" -Limit 100
+```
+
+```powershell Detailed information
+# Get detailed behavior information
+Get-FalconBehavior -Filter "timestamp:>'2026-03-01'" -Detailed -All
+```
+
+```powershell Retrieve by ID
+# Get specific behaviors by their IDs
+$BehaviorIds = @('ind:abc123...', 'ind:def456...')
+Get-FalconBehavior -Id $BehaviorIds
+```
+</CodeGroup>
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconBehavior](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconBehavior)
+
+---
+
+## Get-FalconIncident
+
+Search for incidents in the CrowdStrike Falcon platform.
+
+**Required Permission:** `Incidents: Read`
+
+### Syntax
+
+```powershell
+# Search for incidents
+Get-FalconIncident [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] 
+  [-Detailed] [-All] [-Total]
+
+# Get specific incidents by ID
+Get-FalconIncident -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Incident identifier(s). Can be provided via pipeline.
+  
+  **Pattern:** `^inc:[a-fA-F0-9]{32}:[a-fA-F0-9]{32}$`
+  
+  **Aliases:** `ids`, `incident_id`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+  
+  **Valid values:** `assigned_to.asc`, `assigned_to.desc`, `assigned_to_name.asc`, `assigned_to_name.desc`, `end.asc`, `end.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`, `sort_score.asc`, `sort_score.desc`, `start.asc`, `start.desc`, `state.asc`, `state.desc`, `status.asc`, `status.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request.
+  
+  **Range:** 1-500
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results (used for pagination).
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for incidents.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Search incidents
+# Get all open incidents
+Get-FalconIncident -Filter "state:'open'" -All
+
+# Get incidents sorted by severity score
+Get-FalconIncident -Sort sort_score.desc -Limit 50
+```
+
+```powershell Filter by status
+# Get new incidents
+Get-FalconIncident -Filter "status:'new'" -Sort start.desc
+
+# Get incidents assigned to specific user
+Get-FalconIncident -Filter "assigned_to_name:'user@example.com'"
+```
+
+```powershell Detailed information
+# Get detailed incident information
+Get-FalconIncident -Filter "state:'open'" -Detailed -All
+```
+
+```powershell Retrieve by ID
+# Get specific incidents by their IDs
+$IncidentIds = @('inc:abc123...', 'inc:def456...')
+Get-FalconIncident -Id $IncidentIds
+```
+
+```powershell Pipeline usage
+# Get incident count
+Get-FalconIncident -Filter "status:'new'" -Total
+```
+</CodeGroup>
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconIncident](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconIncident)
+
+---
+
+## Get-FalconScore
+
+Search for CrowdScore values in the CrowdStrike Falcon platform.
+
+**Required Permission:** `Incidents: Read`
+
+### Syntax
+
+```powershell
+Get-FalconScore [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] 
+  [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+  
+  **Valid values:** `score.asc`, `score.desc`, `timestamp.asc`, `timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request.
+  
+  **Range:** 1-2500
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results (used for pagination).
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get CrowdScores
+# Get all CrowdScores
+Get-FalconScore -All
+
+# Get CrowdScores sorted by value
+Get-FalconScore -Sort score.desc -Limit 100
+```
+
+```powershell Time-based filtering
+# Get CrowdScores from specific timeframe
+Get-FalconScore -Filter "timestamp:>'2026-03-01'" -Sort timestamp.desc
+```
+
+```powershell Score threshold
+# Get high scores
+Get-FalconScore -Filter "score:>70" -Sort score.desc -All
+```
+</CodeGroup>
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconScore](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconScore)
+
+---
+
+## Invoke-FalconIncidentAction
+
+Perform actions on incidents in the CrowdStrike Falcon platform.
+
+**Required Permission:** `Incidents: Write`
+
+### Syntax
+
+```powershell
+# Perform a single action
+Invoke-FalconIncidentAction -Name <string> [-Value <string>] [-UpdateDetects <boolean>] 
+  [-OverwriteDetects <boolean>] -Id <string[]>
+
+# Perform multiple actions
+Invoke-FalconIncidentAction -Action <hashtable[]> [-UpdateDetects <boolean>] 
+  [-OverwriteDetects <boolean>] -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform on the incident(s).
+  
+  **Valid values:**
+  - `add_tag` - Add a tag to the incident
+  - `delete_tag` - Remove a tag from the incident
+  - `unassign` - Unassign the incident
+  - `update_description` - Update the incident description
+  - `update_name` - Update the incident name
+  - `update_status` - Update the incident status
+  - `update_assigned_to_v2` - Assign incident to a user
+</ParamField>
+
+<ParamField path="Value" type="string">
+  Value for the chosen action (e.g., tag name, description text, user ID, status value).
+</ParamField>
+
+<ParamField path="Action" type="hashtable[]">
+  One or more hashtables defining multiple name/value pairs for batch operations.
+  
+  **Aliases:** `action_parameters`
+  
+  Example: `@(@{name='add_tag'; value='investigated'}, @{name='update_status'; value='closed'})`
+</ParamField>
+
+<ParamField path="UpdateDetects" type="boolean">
+  Update status of related 'new' detections when updating incident status.
+  
+  **Aliases:** `update_detects`
+</ParamField>
+
+<ParamField path="OverwriteDetects" type="boolean">
+  Replace existing status for related detections when updating incident status.
+  
+  **Aliases:** `overwrite_detects`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Incident identifier(s). Can be provided via pipeline.
+  
+  **Pattern:** `^inc:[a-fA-F0-9]{32}:[a-fA-F0-9]{32}$`
+  
+  **Aliases:** `ids`, `incident_id`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Update incident status
+# Update status of an incident
+Invoke-FalconIncidentAction -Name update_status -Value 'closed' -Id $IncidentId
+
+# Update status and related detections
+Invoke-FalconIncidentAction -Name update_status -Value 'in_progress' -UpdateDetects $true -Id $IncidentId
+```
+
+```powershell Tag management
+# Add a tag to incidents
+Invoke-FalconIncidentAction -Name add_tag -Value 'investigated' -Id $IncidentIds
+
+# Remove a tag from incidents
+Invoke-FalconIncidentAction -Name delete_tag -Value 'pending' -Id $IncidentIds
+```
+
+```powershell Assign incidents
+# Assign incident to a user
+Invoke-FalconIncidentAction -Name update_assigned_to_v2 -Value 'user@example.com' -Id $IncidentId
+
+# Unassign incident
+Invoke-FalconIncidentAction -Name unassign -Id $IncidentId
+```
+
+```powershell Update details
+# Update incident name
+Invoke-FalconIncidentAction -Name update_name -Value 'Critical Security Incident' -Id $IncidentId
+
+# Update incident description
+Invoke-FalconIncidentAction -Name update_description -Value 'Investigation completed on 2026-03-05' -Id $IncidentId
+```
+
+```powershell Multiple actions
+# Perform multiple actions on an incident
+$Actions = @(
+    @{name='add_tag'; value='reviewed'},
+    @{name='update_status'; value='closed'},
+    @{name='update_description'; value='No threat detected'}
+)
+Invoke-FalconIncidentAction -Action $Actions -Id $IncidentId
+```
+
+```powershell Pipeline usage
+# Process incidents from pipeline
+Get-FalconIncident -Filter "status:'new'" | 
+    Invoke-FalconIncidentAction -Name update_status -Value 'in_progress' -UpdateDetects $true
+```
+</CodeGroup>
+
+### Notes
+
+- Maximum of 1000 incident IDs can be processed per request
+- When using `-Action`, multiple operations can be performed in a single API call
+- The `-UpdateDetects` parameter automatically updates related detections when changing incident status
+- Use `-OverwriteDetects` to replace existing detection statuses instead of only updating 'new' detections
+
+### Related Links
+
+- [PSFalcon Wiki: Invoke-FalconIncidentAction](https://github.com/crowdstrike/psfalcon/wiki/Invoke-FalconIncidentAction)

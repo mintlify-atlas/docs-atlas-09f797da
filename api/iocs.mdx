@@ -1,0 +1,462 @@
+---
+title: "IOC Management"
+description: "Manage custom indicators of compromise in CrowdStrike Falcon"
+---
+
+Create, modify, and delete custom indicators of compromise (IOCs) to enhance threat detection and prevention across your environment.
+
+## Cmdlets
+
+### Edit-FalconIoc
+
+Modify custom indicators.
+
+**Permissions**: `IOC Manager APIs: Write`
+
+<ParamField path="InputObject" type="object[]">
+  One or more indicators to modify in a single request
+</ParamField>
+
+<ParamField path="Action" type="string">
+  Action to perform when a host observes the indicator
+</ParamField>
+
+<ParamField path="Platform" type="string[]">
+  Operating system platform
+</ParamField>
+
+<ParamField path="Severity" type="string">
+  Severity level
+</ParamField>
+
+<ParamField path="Source" type="string">
+  Origination source (1-256 characters)
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Indicator description
+</ParamField>
+
+<ParamField path="Filename" type="string">
+  Indicator filename, used with hash values
+</ParamField>
+
+<ParamField path="Tag" type="string[]">
+  Indicator tag
+</ParamField>
+
+<ParamField path="MobileAction" type="string">
+  Action to perform when a mobile device observes the indicator. Valid values: `allow`, `detect`, `no_action`, `prevent`
+</ParamField>
+
+<ParamField path="HostGroup" type="string[]">
+  Host group identifier (32-character hex)
+</ParamField>
+
+<ParamField path="AppliedGlobally" type="boolean">
+  Assign to all host groups
+</ParamField>
+
+<ParamField path="Expiration" type="string">
+  Expiration date and time (UTC ISO 8601). When an indicator expires it is set to 'no_action'
+</ParamField>
+
+<ParamField path="FromParent" type="boolean">
+  Inheritance from parent CID
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="Retrodetect" type="boolean">
+  Generate retroactive detections for hosts that have observed the indicator
+</ParamField>
+
+<ParamField path="IgnoreWarning" type="boolean">
+  Ignore warnings and modify all indicators
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Indicator identifier (64-character hex)
+</ParamField>
+
+```powershell Example
+# Update an indicator's severity
+Edit-FalconIoc -Id '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' -Severity 'high' -Comment 'Updated severity based on new intelligence'
+
+# Change action to prevent
+Edit-FalconIoc -Id '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' -Action 'prevent' -Retrodetect $true
+
+# Set expiration date
+Edit-FalconIoc -Id '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' -Expiration '2024-12-31T23:59:59Z'
+```
+
+---
+
+### Get-FalconIoc
+
+Search for custom indicators.
+
+**Permissions**: `IOC Manager APIs: Read`
+
+<ParamField path="Id" type="string[]">
+  Indicator identifier (64-character hex)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Valid values:
+  - `action.asc`, `action.desc`
+  - `applied_globally.asc`, `applied_globally.desc`
+  - `metadata.av_hits.asc`, `metadata.av_hits.desc`
+  - `metadata.company_name.raw.asc`, `metadata.company_name.raw.desc`
+  - `created_by.asc`, `created_by.desc`
+  - `created_on.asc`, `created_on.desc`
+  - `expiration.asc`, `expiration.desc`
+  - `expired.asc`, `expired.desc`
+  - `metadata.filename.raw.asc`, `metadata.filename.raw.desc`
+  - `modified_by.asc`, `modified_by.desc`
+  - `modified_on.asc`, `modified_on.desc`
+  - `severity_number.asc`, `severity_number.desc`
+  - `source.asc`, `source.desc`
+  - `type.asc`, `type.desc`
+  - `value.asc`, `value.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-2000)
+</ParamField>
+
+<ParamField path="FromParent" type="boolean">
+  Inheritance from parent CID
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+```powershell Example
+# Get all custom IOCs
+Get-FalconIoc -All -Detailed
+
+# Search for indicators by type
+Get-FalconIoc -Filter "type:'ipv4'" -Detailed
+
+# Get indicators created in the last 24 hours
+Get-FalconIoc -Filter "created_on:>'now-24h'" -Sort created_on.desc
+
+# Get specific indicator by ID
+Get-FalconIoc -Id '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
+
+# Get indicators set to 'prevent' action
+Get-FalconIoc -Filter "action:'prevent'" -All
+```
+
+---
+
+### Get-FalconIocAction
+
+Search for custom indicator actions.
+
+**Permissions**: `IOC Manager APIs: Read`
+
+<ParamField path="Id" type="string[]">
+  Custom indicator action identifier
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+```powershell Example
+# Get all available IOC actions
+Get-FalconIocAction -Detailed
+```
+
+---
+
+### Get-FalconIocPlatform
+
+List custom indicator platforms.
+
+**Permissions**: `IOC Manager APIs: Read`
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+```powershell Example
+# List all supported platforms
+Get-FalconIocPlatform
+```
+
+---
+
+### Get-FalconIocSeverity
+
+List custom indicator severities.
+
+**Permissions**: `IOC Manager APIs: Read`
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+```powershell Example
+# List all severity levels
+Get-FalconIocSeverity
+```
+
+---
+
+### Get-FalconIocType
+
+List custom indicator types.
+
+**Permissions**: `IOC Manager APIs: Read`
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+```powershell Example
+# List all available IOC types
+Get-FalconIocType
+```
+
+---
+
+### New-FalconIoc
+
+Create custom indicators.
+
+**Permissions**: `IOC Manager APIs: Write`
+
+<ParamField path="InputObject" type="object[]">
+  One or more indicators to create in a single request
+</ParamField>
+
+<ParamField path="Type" type="string" required>
+  Indicator type
+</ParamField>
+
+<ParamField path="Value" type="string" required>
+  String representation of the indicator
+</ParamField>
+
+<ParamField path="Action" type="string" required>
+  Action to perform when a host observes the indicator
+</ParamField>
+
+<ParamField path="Platform" type="string[]" required>
+  Operating system platform
+</ParamField>
+
+<ParamField path="Severity" type="string" required>
+  Severity level
+</ParamField>
+
+<ParamField path="Source" type="string">
+  Origination source (1-256 characters)
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Indicator description
+</ParamField>
+
+<ParamField path="Filename" type="string">
+  Indicator filename, used with hash values
+</ParamField>
+
+<ParamField path="Tag" type="string[]">
+  Indicator tag
+</ParamField>
+
+<ParamField path="MobileAction" type="string">
+  Action to perform when a mobile device observes the indicator. Valid values: `allow`, `detect`, `no_action`, `prevent`
+</ParamField>
+
+<ParamField path="HostGroup" type="string[]">
+  Host group identifier (32-character hex). Required if AppliedGlobally is not set
+</ParamField>
+
+<ParamField path="AppliedGlobally" type="boolean">
+  Assign to all host groups. Required if HostGroup is not set
+</ParamField>
+
+<ParamField path="Expiration" type="string">
+  Expiration date and time (UTC ISO 8601). When an indicator expires it is set to 'no_action'
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="Retrodetect" type="boolean">
+  Generate retroactive detections for hosts that have observed the indicator
+</ParamField>
+
+<ParamField path="IgnoreWarning" type="boolean">
+  Ignore warnings and create all indicators
+</ParamField>
+
+```powershell Example
+# Create a malicious IP indicator
+New-FalconIoc -Type 'ipv4' -Value '192.0.2.100' -Action 'prevent' -Platform 'windows','linux','mac' -Severity 'high' -Source 'Threat Intel Feed' -Description 'C2 server identified by threat intelligence' -AppliedGlobally $true -Comment 'Added from threat feed'
+
+# Create a file hash indicator
+New-FalconIoc -Type 'sha256' -Value 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -Action 'detect' -Platform 'windows' -Severity 'medium' -Filename 'malware.exe' -AppliedGlobally $true -Retrodetect $true
+
+# Create a domain indicator with expiration
+New-FalconIoc -Type 'domain' -Value 'malicious-site.com' -Action 'prevent' -Platform 'windows','mac' -Severity 'critical' -Tag 'phishing','campaign-2024' -AppliedGlobally $true -Expiration '2024-12-31T23:59:59Z'
+
+# Create indicator for specific host groups
+$HostGroups = @('a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6', 'p6o5n4m3l2k1j0i9h8g7f6e5d4c3b2a1')
+New-FalconIoc -Type 'ipv4' -Value '198.51.100.50' -Action 'detect' -Platform 'linux' -Severity 'low' -HostGroup $HostGroups
+```
+
+---
+
+### Remove-FalconIoc
+
+Remove custom indicators.
+
+**Permissions**: `IOC Manager APIs: Write`
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to find indicators for removal
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="FromParent" type="boolean">
+  Inheritance from parent CID
+</ParamField>
+
+<ParamField path="Id" type="string[]">
+  Indicator identifier (64-character hex)
+</ParamField>
+
+```powershell Example
+# Remove a specific indicator
+Remove-FalconIoc -Id '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' -Comment 'False positive'
+
+# Remove expired indicators
+Remove-FalconIoc -Filter "expired:true" -Comment 'Cleanup expired IOCs'
+
+# Remove indicators by tag
+Remove-FalconIoc -Filter "tags:'temp-investigation'" -Comment 'Investigation closed'
+```
+
+## IOC Management Workflow
+
+<Steps>
+  <Step title="Identify Threat Indicators">
+    Obtain IOC values from threat intelligence feeds, incident investigations, or security research.
+  </Step>
+  
+  <Step title="Validate IOC Types">
+    Use `Get-FalconIocType` to verify supported indicator types (IPv4, domain, SHA256, etc.).
+  </Step>
+  
+  <Step title="Create Indicators">
+    Use `New-FalconIoc` to create indicators with appropriate action, severity, and scope.
+  </Step>
+  
+  <Step title="Monitor and Update">
+    Use `Get-FalconIoc` to review existing indicators and `Edit-FalconIoc` to update as needed.
+  </Step>
+  
+  <Step title="Clean Up">
+    Remove outdated or false positive indicators using `Remove-FalconIoc`.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Expiration Dates">
+    Set expiration dates on temporary IOCs to automatically prevent them from blocking legitimate traffic after investigations conclude.
+  </Accordion>
+  
+  <Accordion title="Enable Retrodetection Carefully">
+    Use the `Retrodetect` parameter when creating or editing IOCs only when you need to identify past compromises. This can generate significant detections.
+  </Accordion>
+  
+  <Accordion title="Tag for Organization">
+    Apply meaningful tags to group related indicators (e.g., by campaign, threat actor, or investigation ID) for easier management.
+  </Accordion>
+  
+  <Accordion title="Document with Comments">
+    Always use the `Comment` parameter to maintain an audit trail of why indicators were created, modified, or removed.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Falcon Intelligence" icon="brain" href="/api/intel">
+    Access CrowdStrike threat intelligence
+  </Card>
+  <Card title="Detections" icon="shield-exclamation" href="/api/detects">
+    Manage and investigate detections
+  </Card>
+</CardGroup>

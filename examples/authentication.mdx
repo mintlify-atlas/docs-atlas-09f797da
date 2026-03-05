@@ -1,0 +1,266 @@
+---
+title: Authentication
+description: Authentication patterns and token management with PSFalcon
+icon: key
+---
+
+Learn how to authenticate with the CrowdStrike Falcon APIs using different OAuth2 patterns, including single-tenant, multi-tenant (MSSP), and cloud-specific authentication.
+
+## Basic Authentication
+
+Request and manage an OAuth2 token for API access.
+
+<Steps>
+  <Step title="Request a token">
+    Use your API credentials to request an OAuth2 token:
+    
+    ```powershell
+    Request-FalconToken -ClientId <string> -ClientSecret <string>
+    ```
+    
+    The token is stored in `$Falcon` and used automatically by all PSFalcon commands.
+  </Step>
+  
+  <Step title="Verify the token">
+    Check if you have an active token:
+    
+    ```powershell
+    Test-FalconToken
+    ```
+  </Step>
+  
+  <Step title="Revoke the token">
+    Always revoke your token when finished:
+    
+    ```powershell
+    Revoke-FalconToken
+    ```
+  </Step>
+</Steps>
+
+## Cloud-Specific Authentication
+
+Authenticate to different CrowdStrike cloud regions.
+
+<CodeGroup>
+```powershell US-1 (Default)
+Request-FalconToken -ClientId abc123 -ClientSecret def456
+```
+
+```powershell US-2
+Request-FalconToken -ClientId abc123 -ClientSecret def456 -Cloud 'us-2'
+```
+
+```powershell EU-1
+Request-FalconToken -ClientId abc123 -ClientSecret def456 -Cloud 'eu-1'
+```
+
+```powershell US-GOV-1
+Request-FalconToken -ClientId abc123 -ClientSecret def456 -Cloud 'us-gov-1'
+```
+
+```powershell Custom Hostname
+Request-FalconToken -ClientId abc123 -ClientSecret def456 -Hostname 'https://api.us-2.crowdstrike.com'
+```
+</CodeGroup>
+
+## Script Template with Token Management
+
+A complete script template with proper token lifecycle management.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('^[a-fA-F0-9]{32}$')]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [ValidatePattern('^\w{40}$')]
+  [string]$ClientSecret,
+  
+  [ValidateSet('us-1','us-2','us-gov-1','eu-1',IgnoreCase=$false)]
+  [string]$Cloud
+)
+
+begin {
+  # Build hashtable for authorization token request
+  $Token = @{}
+  @('ClientId','ClientSecret','Cloud').foreach{
+    if ($PSBoundParameters.$_) { $Token[$_] = $PSBoundParameters.$_ }
+  }
+}
+
+process {
+  try {
+    # Request an authorization token from the Falcon APIs
+    Request-FalconToken @Token
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      # Your code here
+      Get-FalconHost -Limit 5
+    }
+  } catch {
+    throw $_
+  } finally {
+    # Silently revoke active authorization token
+    if ((Test-FalconToken).Token -eq $true) { 
+      [void](Revoke-FalconToken) 
+    }
+  }
+}
+```
+
+## Member CID Authentication
+
+Authenticate to a specific child CID in a Flight Control (MSSP) environment.
+
+```powershell
+# Authenticate to a specific child CID
+Request-FalconToken -ClientId abc123 -ClientSecret def456 -MemberCid <32-character-cid>
+
+# Verify which CID you're authenticated to
+(Test-FalconToken).Cid
+```
+
+## Multi-Tenant Authentication Loop
+
+Iterate through multiple child CIDs in a Flight Control environment.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('^[a-fA-F0-9]{32}$')]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [ValidatePattern('^\w{40}$')]
+  [string]$ClientSecret,
+  
+  [ValidateSet('us-1','us-2','us-gov-1','eu-1')]
+  [string]$Cloud,
+  
+  [ValidatePattern('^[a-fA-F0-9]{32}$')]
+  [string[]]$MemberCid
+)
+
+begin {
+  $Token = @{}
+  @('ClientId','ClientSecret','Cloud').foreach{
+    if ($PSBoundParameters.$_) { $Token[$_] = $PSBoundParameters.$_ }
+  }
+  
+  if (!$MemberCid) {
+    # Get all active child CIDs if not specified
+    Request-FalconToken @Token
+    if ((Test-FalconToken).Token -eq $true) {
+      [string[]]$MemberCid = Get-FalconMemberCid -Detailed -All | 
+        Where-Object { $_.status -eq 'active' } | 
+        Select-Object -ExpandProperty child_cid
+      [void](Revoke-FalconToken)
+    }
+  }
+}
+
+process {
+  foreach ($Cid in $MemberCid) {
+    try {
+      # Request token for each member CID
+      Request-FalconToken @Token -MemberCid $Cid
+      
+      if ((Test-FalconToken).Token -eq $true) {
+        Write-Host "Processing CID: $Cid"
+        
+        # Your code here
+        $HostCount = (Get-FalconHost -Total)
+        Write-Host "  Hosts: $HostCount"
+      }
+    } catch {
+      Write-Error $_
+    } finally {
+      if ((Test-FalconToken).Token -eq $true) {
+        # Revoke token and pause to prevent rate limiting
+        [void](Revoke-FalconToken)
+        Start-Sleep -Seconds 5
+      }
+    }
+  }
+}
+```
+
+## Environment Variables
+
+Store credentials securely using environment variables.
+
+```powershell
+# Set environment variables (do this once, outside your script)
+$env:FALCON_CLIENT_ID = 'your-client-id'
+$env:FALCON_CLIENT_SECRET = 'your-client-secret'
+$env:FALCON_CLOUD = 'us-1'
+
+# Use in your script
+Request-FalconToken -ClientId $env:FALCON_CLIENT_ID -ClientSecret $env:FALCON_CLIENT_SECRET -Cloud $env:FALCON_CLOUD
+```
+
+## Secure Credential Storage
+
+Use PowerShell credential objects for enhanced security.
+
+```powershell
+# Create and save encrypted credential
+$Credential = Get-Credential -Message 'Enter Falcon API credentials'
+$Credential | Export-Clixml -Path "$env:USERPROFILE\.falcon\credential.xml"
+
+# Load and use credential
+$Credential = Import-Clixml -Path "$env:USERPROFILE\.falcon\credential.xml"
+Request-FalconToken -ClientId $Credential.UserName -ClientSecret $Credential.GetNetworkCredential().Password
+```
+
+<Warning>
+  Always revoke tokens when your script completes. Use `try/catch/finally` blocks to ensure tokens are revoked even if errors occur.
+</Warning>
+
+## Error Handling
+
+Handle authentication errors gracefully.
+
+```powershell
+try {
+  Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+  
+  if ((Test-FalconToken).Token -ne $true) {
+    throw "Failed to obtain valid token"
+  }
+  
+  # Your code here
+  
+} catch {
+  if ($_.Exception.Message -match '403') {
+    Write-Error "Authentication failed: Invalid credentials or insufficient permissions"
+  } elseif ($_.Exception.Message -match '429') {
+    Write-Error "Rate limit exceeded: Please wait before retrying"
+  } else {
+    Write-Error "Authentication error: $($_.Exception.Message)"
+  }
+} finally {
+  if ((Test-FalconToken).Token -eq $true) {
+    [void](Revoke-FalconToken)
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Host Operations" icon="server" href="/examples/host-operations">
+    Manage and query hosts
+  </Card>
+  <Card title="Detection Management" icon="shield-halved" href="/examples/detection-management">
+    Work with detections
+  </Card>
+</CardGroup>

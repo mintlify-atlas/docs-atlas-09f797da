@@ -1,0 +1,218 @@
+---
+title: OverWatch
+description: Retrieve Falcon OverWatch dashboard metrics and aggregates
+---
+
+## Get-FalconOverWatchEvent
+
+Retrieve the total number of Falcon OverWatch events across all customers.
+
+**Required Permission:** `OverWatch Dashboard: Read`
+
+### Syntax
+
+```powershell
+Get-FalconOverWatchEvent -Filter <string>
+```
+
+### Parameters
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get event counts
+# Get total OverWatch events for a specific time period
+Get-FalconOverWatchEvent -Filter "timestamp:>'2026-03-01'"
+
+# Get events for specific customer
+Get-FalconOverWatchEvent -Filter "cid:'abc123def456'"
+```
+
+```powershell Time-based filtering
+# Get events from last 24 hours
+Get-FalconOverWatchEvent -Filter "timestamp:>'now-24h'"
+
+# Get events for specific date range
+Get-FalconOverWatchEvent -Filter "timestamp:>='2026-03-01'+timestamp:<='2026-03-05'"
+```
+</CodeGroup>
+
+### Notes
+
+- This cmdlet returns aggregate counts of OverWatch events
+- Results represent global event data across all customers
+- Use precise FQL filters to narrow down results to relevant time periods or customer identifiers
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconOverWatchEvent](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconOverWatchEvent)
+
+---
+
+## Get-FalconOverWatchDetection
+
+Retrieve the total number of Falcon OverWatch detections across all customers.
+
+**Required Permission:** `OverWatch Dashboard: Read`
+
+### Syntax
+
+```powershell
+Get-FalconOverWatchDetection -Filter <string>
+```
+
+### Parameters
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get detection counts
+# Get total OverWatch detections for a specific time period
+Get-FalconOverWatchDetection -Filter "timestamp:>'2026-03-01'"
+
+# Get detections for specific customer
+Get-FalconOverWatchDetection -Filter "cid:'abc123def456'"
+```
+
+```powershell Time-based filtering
+# Get detections from last 7 days
+Get-FalconOverWatchDetection -Filter "timestamp:>'now-7d'"
+
+# Get detections for specific date range
+Get-FalconOverWatchDetection -Filter "timestamp:>='2026-03-01'+timestamp:<='2026-03-05'"
+```
+
+```powershell Severity filtering
+# Get high severity detections
+Get-FalconOverWatchDetection -Filter "severity:'high'+timestamp:>'now-30d'"
+```
+</CodeGroup>
+
+### Notes
+
+- This cmdlet returns aggregate counts of OverWatch detections
+- Results represent global detection data across all customers
+- OverWatch detections indicate potential threats identified by CrowdStrike's human threat hunters
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconOverWatchDetection](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconOverWatchDetection)
+
+---
+
+## Get-FalconOverWatchIncident
+
+Retrieve the total number of Falcon OverWatch incidents across all customers.
+
+**Required Permission:** `OverWatch Dashboard: Read`
+
+### Syntax
+
+```powershell
+Get-FalconOverWatchIncident -Filter <string>
+```
+
+### Parameters
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language (FQL) expression to limit results.
+  
+  Must be a valid FQL statement.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get incident counts
+# Get total OverWatch incidents for a specific time period
+Get-FalconOverWatchIncident -Filter "timestamp:>'2026-03-01'"
+
+# Get incidents for specific customer
+Get-FalconOverWatchIncident -Filter "cid:'abc123def456'"
+```
+
+```powershell Time-based filtering
+# Get incidents from last 30 days
+Get-FalconOverWatchIncident -Filter "timestamp:>'now-30d'"
+
+# Get incidents for specific date range
+Get-FalconOverWatchIncident -Filter "timestamp:>='2026-03-01'+timestamp:<='2026-03-05'"
+```
+
+```powershell Status filtering
+# Get open incidents
+Get-FalconOverWatchIncident -Filter "status:'open'+timestamp:>'now-30d'"
+```
+</CodeGroup>
+
+### Notes
+
+- This cmdlet returns aggregate counts of OverWatch incidents
+- Results represent global incident data across all customers
+- OverWatch incidents represent confirmed security threats identified by CrowdStrike's threat hunting team
+
+### Related Links
+
+- [PSFalcon Wiki: Get-FalconOverWatchIncident](https://github.com/crowdstrike/psfalcon/wiki/Get-FalconOverWatchIncident)
+
+---
+
+## About Falcon OverWatch
+
+Falcon OverWatch is CrowdStrike's managed threat hunting service that proactively searches for threats in your environment 24/7/365. The OverWatch dashboard cmdlets provide aggregate metrics to help you understand the global threat landscape.
+
+### Key Concepts
+
+<CardGroup cols={3}>
+  <Card title="Events" icon="list">
+    Raw telemetry data collected and analyzed by OverWatch threat hunters
+  </Card>
+  <Card title="Detections" icon="magnifying-glass">
+    Potential threats identified through OverWatch hunting activities
+  </Card>
+  <Card title="Incidents" icon="triangle-exclamation">
+    Confirmed security threats requiring immediate attention
+  </Card>
+</CardGroup>
+
+### Common Use Cases
+
+<AccordionGroup>
+  <Accordion title="Monitor threat landscape">
+    Use these cmdlets to track the volume of security events, detections, and incidents over time to understand your organization's threat exposure.
+  </Accordion>
+  
+  <Accordion title="Generate compliance reports">
+    Retrieve aggregate metrics for specific time periods to demonstrate security monitoring coverage and threat detection capabilities.
+  </Accordion>
+  
+  <Accordion title="Trend analysis">
+    Compare event, detection, and incident counts across different time periods to identify trends and patterns in threat activity.
+  </Accordion>
+</AccordionGroup>
+
+### Best Practices
+
+<Note>
+  All OverWatch dashboard cmdlets require a `Filter` parameter with valid FQL syntax. Always specify a time range to ensure relevant results.
+</Note>
+
+<Tip>
+  Use relative time filters like `timestamp:>'now-24h'` for dynamic queries, or absolute timestamps for fixed reporting periods.
+</Tip>
+
+<Warning>
+  OverWatch dashboard data represents aggregate counts across all customers. Ensure you filter by appropriate customer identifiers (CID) when needed.
+</Warning>

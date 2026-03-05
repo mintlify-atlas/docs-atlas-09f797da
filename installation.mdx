@@ -1,0 +1,258 @@
+---
+title: Installation
+description: How to install and configure PSFalcon
+---
+
+## Prerequisites
+
+Before installing PSFalcon, verify your environment meets these requirements:
+
+<Steps>
+  <Step title="PowerShell Version">
+    Check your PowerShell version:
+    
+    ```powershell
+    $PSVersionTable.PSVersion
+    ```
+    
+    **Required versions:**
+    - Windows: PowerShell 5.1 or later
+    - Linux/macOS: PowerShell 6 or later
+  </Step>
+  
+  <Step title="Internet Connectivity">
+    Ensure you have internet access to download from the PowerShell Gallery and connect to CrowdStrike Falcon APIs
+  </Step>
+  
+  <Step title="API Client Credentials">
+    Create an OAuth2 API client in your Falcon console:
+    1. Navigate to **Support and resources > API Clients and Keys**
+    2. Click **Add new API client**
+    3. Provide a name and description
+    4. Select the appropriate API scopes (minimum: **Hosts: Read**)
+    5. Save your **Client ID** and **Client Secret** (shown only once)
+  </Step>
+</Steps>
+
+<Warning>
+  Store your API credentials securely. The Client Secret is only displayed once during creation. If lost, you must create a new API client.
+</Warning>
+
+## Install from PowerShell Gallery
+
+PSFalcon is published to the [PowerShell Gallery](https://www.powershellgallery.com/packages/PSFalcon), making installation straightforward.
+
+### Install for Current User
+
+Recommended for most users (no administrator/root privileges required):
+
+```powershell
+Install-Module -Name PSFalcon -Scope CurrentUser
+```
+
+### Install for All Users
+
+Requires administrator privileges on Windows or root on Linux/macOS:
+
+<CodeGroup>
+```powershell Windows (Administrator)
+Install-Module -Name PSFalcon -Scope AllUsers
+```
+
+```bash Linux/macOS (root)
+sudo pwsh -Command "Install-Module -Name PSFalcon -Scope AllUsers"
+```
+</CodeGroup>
+
+### Install Specific Version
+
+To install a specific version of PSFalcon:
+
+```powershell
+Install-Module -Name PSFalcon -RequiredVersion 2.2.9 -Scope CurrentUser
+```
+
+## Verify Installation
+
+Confirm PSFalcon is installed correctly:
+
+```powershell
+Get-Module -Name PSFalcon -ListAvailable
+```
+
+<Frame>
+  <img src="/images/psfalcon-version.png" alt="PSFalcon module information" />
+</Frame>
+
+Expected output:
+```
+ModuleType Version    Name           ExportedCommands
+---------- -------    ----           ----------------
+Script     2.2.9      PSFalcon       {Add-FalconGroupingTag, Add-FalconRole, ...}
+```
+
+## Import the Module
+
+Load PSFalcon into your PowerShell session:
+
+```powershell
+Import-Module -Name PSFalcon
+```
+
+<Note>
+  PowerShell automatically imports modules when you use their cmdlets, so explicit import is optional. However, explicit import can help verify the module loads without errors.
+</Note>
+
+## Update PSFalcon
+
+Keep PSFalcon up to date to access new features and bug fixes:
+
+```powershell
+Update-Module -Name PSFalcon
+```
+
+Check for available updates:
+
+```powershell
+# Get installed version
+$Installed = (Get-Module -Name PSFalcon -ListAvailable).Version
+
+# Get latest version from PowerShell Gallery
+$Latest = (Find-Module -Name PSFalcon).Version
+
+if ($Latest -gt $Installed) {
+    Write-Host "Update available: $Installed -> $Latest"
+} else {
+    Write-Host "PSFalcon is up to date: $Installed"
+}
+```
+
+## Uninstall PSFalcon
+
+If needed, remove PSFalcon from your system:
+
+```powershell
+Uninstall-Module -Name PSFalcon
+```
+
+To remove all versions:
+
+```powershell
+Uninstall-Module -Name PSFalcon -AllVersions
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Installation fails with 'Unable to download from URI'">
+    **Issue**: Cannot connect to PowerShell Gallery
+    
+    **Solutions**:
+    - Check internet connectivity
+    - Verify proxy settings if behind a corporate firewall
+    - Ensure TLS 1.2 is enabled:
+      ```powershell
+      [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+      ```
+  </Accordion>
+  
+  <Accordion title="'Install-Module' is not recognized">
+    **Issue**: PowerShellGet module is not available
+    
+    **Solution**: Update to PowerShell 5.1 or later, or install PowerShellGet:
+    ```powershell
+    Install-Module -Name PowerShellGet -Force
+    ```
+  </Accordion>
+  
+  <Accordion title="Module fails to import">
+    **Issue**: Import-Module returns errors
+    
+    **Solutions**:
+    - Verify .NET Framework 4.5+ is installed (Windows)
+    - Check execution policy:
+      ```powershell
+      Get-ExecutionPolicy
+      Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+      ```
+    - Review error messages for missing dependencies
+  </Accordion>
+  
+  <Accordion title="'PSFalcon' module not found after installation">
+    **Issue**: Module installed but not detected
+    
+    **Solution**: Check module path:
+    ```powershell
+    $env:PSModulePath -split [IO.Path]::PathSeparator
+    ```
+    Ensure PSFalcon is in one of these directories.
+  </Accordion>
+</AccordionGroup>
+
+## Offline Installation
+
+For environments without internet access:
+
+<Steps>
+  <Step title="Download on Connected System">
+    On a system with internet access:
+    ```powershell
+    Save-Module -Name PSFalcon -Path C:\Temp\PSFalcon
+    ```
+  </Step>
+  
+  <Step title="Transfer Files">
+    Copy the downloaded module folder to your offline system
+  </Step>
+  
+  <Step title="Install on Offline System">
+    Place the module in your PowerShell module path:
+    
+    **Windows**:
+    ```powershell
+    Copy-Item -Path "C:\Temp\PSFalcon\PSFalcon" -Destination "$env:ProgramFiles\WindowsPowerShell\Modules\" -Recurse
+    ```
+    
+    **Linux/macOS**:
+    ```bash
+    cp -r /tmp/PSFalcon/PSFalcon ~/.local/share/powershell/Modules/
+    ```
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```powershell
+    Import-Module PSFalcon
+    Get-Module PSFalcon
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+PSFalcon uses `System.Net.Http` for API requests and automatically configures TLS 1.2.
+
+### Required Assemblies
+
+- System.Net.Http (automatically loaded)
+
+### Supported Clouds
+
+PSFalcon supports all CrowdStrike cloud regions:
+
+| Cloud | Region | Hostname |
+|-------|--------|----------|
+| us-1 | US Commercial 1 | `https://api.crowdstrike.com` |
+| us-2 | US Commercial 2 | `https://api.us-2.crowdstrike.com` |
+| eu-1 | EU | `https://api.eu-1.crowdstrike.com` |
+| us-gov-1 | US GovCloud 1 | `https://api.laggar.gcw.crowdstrike.com` |
+| us-gov-2 | US GovCloud 2 | `https://api.us-gov-2.crowdstrike.mil` |
+
+<Tip>
+  PSFalcon automatically handles cloud redirects. If you authenticate to the wrong cloud, the module will redirect you to the correct region based on your API client.
+</Tip>
+
+## Next Steps
+
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Learn how to authenticate and run your first PSFalcon commands
+</Card>

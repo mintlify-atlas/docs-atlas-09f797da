@@ -1,0 +1,353 @@
+---
+title: User Management
+description: Manage Falcon users, roles, and permissions with PSFalcon
+icon: users
+---
+
+## Overview
+
+The User Management API enables you to create, modify, and manage users within your CrowdStrike Falcon environment. You can assign roles, manage permissions, perform user actions, and control access to your organization's security resources.
+
+<Info>
+All user management operations require **User management: Read** or **User management: Write** permissions.
+</Info>
+
+## User Operations
+
+### Create a User
+
+Create new users in your Falcon environment. If no password is provided, users receive an email with a link to set their password.
+
+```powershell New-FalconUser
+New-FalconUser -Username 'john.doe@example.com' -FirstName 'John' -LastName 'Doe'
+```
+
+<ParamField path="Username" type="string" required>
+Email address for the user account. Must be a valid email format.
+</ParamField>
+
+<ParamField path="FirstName" type="string">
+User's first name
+</ParamField>
+
+<ParamField path="LastName" type="string">
+User's last name
+</ParamField>
+
+<ParamField path="Password" type="string">
+Password for the user. Must contain at least 12 characters with uppercase, lowercase, numbers, and special characters (#?!@$ %^&*-). If omitted, user receives email to set password.
+</ParamField>
+
+<ParamField path="Cid" type="string">
+Customer identifier for MSSP child CID user creation. Must match pattern `[a-fA-F0-9]{32}(-\w{2})?`
+</ParamField>
+
+<ParamField path="ValidateOnly" type="boolean">
+Validate if user can be created without actually creating them
+</ParamField>
+
+<Note>
+Password requirements: minimum 12 characters, at least one uppercase letter, one lowercase letter, one number, and one special character.
+</Note>
+
+### Get Users
+
+Search for and retrieve user information.
+
+```powershell Search by Filter
+Get-FalconUser -Filter "last_name:'Smith'" -Detailed
+```
+
+```powershell By Username
+Get-FalconUser -Username 'jane.smith@example.com' -Include roles
+```
+
+```powershell By User ID
+$UserId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+Get-FalconUser -Id $UserId
+```
+
+<ParamField path="Id" type="string[]">
+User identifier(s) in UUID format
+</ParamField>
+
+<ParamField path="Filter" type="string">
+Falcon Query Language expression to filter results (e.g., `last_name:'Doe'`, `uid:*'@example.com'`)
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort results by field and direction: `first_name|asc`, `first_name|desc`, `last_name|asc`, `last_name|desc`, `name|asc`, `name|desc`, `uid|asc`, `uid|desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Username" type="string[]">
+One or more email addresses to search for
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+Include additional properties. Available: `roles`
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed user information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count instead of results
+</ParamField>
+
+### Modify User
+
+Update user information such as first name or last name.
+
+```powershell Update Name
+Edit-FalconUser -Id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' -FirstName 'Jane' -LastName 'Doe-Smith'
+```
+
+<ParamField path="FirstName" type="string">
+New first name for the user
+</ParamField>
+
+<ParamField path="LastName" type="string">
+New last name for the user
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+User identifier (UUID format)
+</ParamField>
+
+### Remove User
+
+Delete a user from your Falcon environment.
+
+```powershell Delete User
+Remove-FalconUser -Id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+<ParamField path="Id" type="string" required>
+User identifier to remove (UUID format)
+</ParamField>
+
+<Warning>
+Removing a user is permanent and cannot be undone. Ensure you have proper authorization before deleting users.
+</Warning>
+
+## Role Management
+
+### Assign Roles
+
+Grant roles to users to control their permissions within Falcon.
+
+```powershell Assign Role
+Add-FalconRole -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' -Cid '1234567890abcdef1234567890abcdef' -Id 'falcon_administrator'
+```
+
+```powershell Assign Multiple Roles
+Add-FalconRole -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' -Cid '1234567890abcdef1234567890abcdef' -Id @('event_viewer', 'detection_responder')
+```
+
+```powershell Assign with Expiration
+Add-FalconRole -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' -Cid '1234567890abcdef1234567890abcdef' -Id 'temp_admin' -ExpiresAt '2026-12-31T23:59:59Z'
+```
+
+<ParamField path="UserId" type="string" required>
+User identifier (UUID format)
+</ParamField>
+
+<ParamField path="Cid" type="string" required>
+Customer identifier (32-character hexadecimal, optionally with 2-character suffix)
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+One or more role identifiers to assign
+</ParamField>
+
+<ParamField path="ExpiresAt" type="string">
+Role expiration date and time in RFC3339 format (UTC): `YYYY-MM-DDTHH:mm:ssZ`
+</ParamField>
+
+### Get Roles
+
+Retrieve available roles and user role assignments.
+
+```powershell Get All Roles
+Get-FalconRole -Detailed
+```
+
+```powershell Get User's Roles
+Get-FalconRole -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+```powershell Get Specific Role
+Get-FalconRole -Id 'falcon_administrator'
+```
+
+<ParamField path="Id" type="string[]">
+Role identifier(s) to retrieve
+</ParamField>
+
+<ParamField path="UserId" type="string">
+User identifier to retrieve role assignments for
+</ParamField>
+
+<ParamField path="Cid" type="string">
+Customer identifier to filter results
+</ParamField>
+
+<ParamField path="DirectOnly" type="boolean">
+Display only direct user role grants (excludes inherited roles)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+Falcon Query Language expression to filter results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `cid|asc`, `cid|desc`, `role_name|asc`, `role_name|desc`, `type|asc`, `type|desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="string">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed role information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+### Remove Roles
+
+Revoke roles from users.
+
+```powershell Remove Role
+Remove-FalconRole -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' -Cid '1234567890abcdef1234567890abcdef' -Id 'temp_admin'
+```
+
+<ParamField path="UserId" type="string" required>
+User identifier (UUID format)
+</ParamField>
+
+<ParamField path="Cid" type="string" required>
+Customer identifier
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+Role identifier(s) to revoke
+</ParamField>
+
+## User Actions
+
+Perform administrative actions on user accounts.
+
+```powershell Reset Password
+Invoke-FalconUserAction -Name 'reset_password' -Id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+```powershell Reset Two-Factor Authentication
+Invoke-FalconUserAction -Name 'reset_2fa' -Id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+<ParamField path="Name" type="string" required>
+Action to perform: `reset_password` or `reset_2fa`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+User identifier(s) to perform action on
+</ParamField>
+
+<Info>
+`reset_password` sends a password reset email to the user. `reset_2fa` clears the user's two-factor authentication settings, requiring re-enrollment.
+</Info>
+
+## User Provisioning Workflow
+
+Here's a complete example of provisioning a new user with roles:
+
+```powershell Complete User Provisioning
+# Step 1: Create the user
+$NewUser = New-FalconUser -Username 'security.analyst@example.com' -FirstName 'Security' -LastName 'Analyst'
+
+# Step 2: Assign roles
+Add-FalconRole -UserId $NewUser.uuid -Cid '1234567890abcdef1234567890abcdef' -Id @('event_viewer', 'detection_responder')
+
+# Step 3: Verify user and roles
+Get-FalconUser -Id $NewUser.uuid -Include roles -Detailed
+```
+
+```powershell Temporary Access Grant
+# Create temporary user with time-limited role
+$TempUser = New-FalconUser -Username 'contractor@example.com' -FirstName 'Temp' -LastName 'Contractor'
+
+# Assign role with 30-day expiration
+$ExpirationDate = (Get-Date).AddDays(30).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+Add-FalconRole -UserId $TempUser.uuid -Cid '1234567890abcdef1234567890abcdef' -Id 'falcon_dashboard_viewer' -ExpiresAt $ExpirationDate
+```
+
+## Common Roles
+
+<CardGroup cols={2}>
+  <Card title="falcon_administrator" icon="user-shield">
+    Full administrative access to all Falcon features
+  </Card>
+  <Card title="detection_responder" icon="shield-halved">
+    View and respond to detections and incidents
+  </Card>
+  <Card title="event_viewer" icon="eye">
+    Read-only access to events and detections
+  </Card>
+  <Card title="real_time_responder" icon="bolt">
+    Execute Real Time Response sessions
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use Strong Authentication">
+    Always enforce strong passwords and enable two-factor authentication for all users.
+  </Step>
+  <Step title="Principle of Least Privilege">
+    Assign only the minimum roles required for users to perform their job functions.
+  </Step>
+  <Step title="Regular Audits">
+    Periodically review user accounts and role assignments using `Get-FalconUser -Include roles -Detailed`.
+  </Step>
+  <Step title="Temporary Access">
+    Use the `ExpiresAt` parameter when granting temporary elevated privileges.
+  </Step>
+  <Step title="Offboarding Process">
+    Remove users promptly when they leave the organization using `Remove-FalconUser`.
+  </Step>
+</Steps>
+
+## Related Resources
+
+<Card title="MSSP Management" icon="building" href="/api/mssp">
+  Manage multi-tenant environments with Flight Control
+</Card>
+
+<Card title="Identity Protection" icon="fingerprint" href="/api/identity-protection">
+  Configure identity-based threat detection rules
+</Card>

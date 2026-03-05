@@ -1,0 +1,323 @@
+---
+title: Prevention Policies
+description: Manage Prevention policies to control malware protection and threat detection settings
+---
+
+## Overview
+
+Prevention policies control malware protection settings, detection behaviors, and other security features on endpoints. These policies define how the Falcon sensor prevents and detects threats across different platforms.
+
+<Info>
+**Required API Scope:** `Prevention Policies: Read` (for read operations) or `Prevention Policies: Write` (for write operations)
+</Info>
+
+## Get Prevention Policies
+
+Search for and retrieve Prevention policies.
+
+```powershell Get-FalconPreventionPolicy
+Get-FalconPreventionPolicy [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Include] <string[]>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Policy identifier(s). Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  Example: `platform_name:'Windows'+enabled:true`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Valid values: `created_by.asc`, `created_by.desc`, `created_timestamp.asc`, `created_timestamp.desc`, `enabled.asc`, `enabled.desc`, `modified_by.asc`, `modified_by.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`, `platform_name.asc`, `platform_name.desc`, `precedence.asc`, `precedence.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties
+  
+  Valid values: `members`
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get all policies
+Get-FalconPreventionPolicy -All -Detailed
+```
+
+```powershell Filter by platform
+Get-FalconPreventionPolicy -Filter "platform_name:'Windows'" -Detailed
+```
+
+```powershell Get specific policy with members
+Get-FalconPreventionPolicy -Id <policy_id> -Include members
+```
+</CodeGroup>
+
+## Create Prevention Policy
+
+Create new Prevention policies.
+
+```powershell New-FalconPreventionPolicy
+New-FalconPreventionPolicy -Name <string> -PlatformName <string> [[-Description] <string>] [[-Setting] <object[]>]
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`, `iOS`, `Android`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Setting" type="object[]">
+  An array of policy settings containing prevention configuration. Each setting should include `id` and `value` properties.
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to create in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Create Windows policy
+$Settings = @(
+    @{ id = 'PREVENTION_ADWARE'; value = 'ENABLED' },
+    @{ id = 'PREVENTION_UNWANTED_SOFTWARE'; value = 'ENABLED' }
+)
+New-FalconPreventionPolicy -Name 'Production Servers' -PlatformName 'Windows' -Description 'Prevention policy for production servers' -Setting $Settings
+```
+
+```powershell Create Mac policy
+New-FalconPreventionPolicy -Name 'Mac Workstations' -PlatformName 'Mac' -Description 'Prevention for Mac endpoints'
+```
+</CodeGroup>
+
+## Edit Prevention Policy
+
+Modify existing Prevention policies.
+
+```powershell Edit-FalconPreventionPolicy
+Edit-FalconPreventionPolicy -Id <string> [[-Name] <string>] [[-Description] <string>] [[-Setting] <object[]>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Policy name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Setting" type="object[]">
+  Policy settings to update. Each setting should contain `id` and `value`.
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to modify in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Update policy name
+Edit-FalconPreventionPolicy -Id <policy_id> -Name 'Updated Policy Name'
+```
+
+```powershell Update settings
+$UpdatedSettings = @(
+    @{ id = 'PREVENTION_ADWARE'; value = 'DISABLED' }
+)
+Edit-FalconPreventionPolicy -Id <policy_id> -Setting $UpdatedSettings
+```
+</CodeGroup>
+
+## Remove Prevention Policy
+
+Remove Prevention policies.
+
+```powershell Remove-FalconPreventionPolicy
+Remove-FalconPreventionPolicy -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifier(s) to remove. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Example
+
+```powershell
+Remove-FalconPreventionPolicy -Id <policy_id>
+```
+
+## Policy Actions
+
+Perform actions on Prevention policies such as enabling/disabling or assigning to host groups.
+
+```powershell Invoke-FalconPreventionPolicyAction
+Invoke-FalconPreventionPolicyAction -Name <string> [[-GroupId] <string>] -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform
+  
+  Valid values: `add-host-group`, `add-rule-group`, `disable`, `enable`, `remove-host-group`, `remove-rule-group`
+</ParamField>
+
+<ParamField path="GroupId" type="string">
+  Host or rule group identifier. Pattern: `^[a-fA-F0-9]{32}$`
+  
+  Required for: `add-host-group`, `add-rule-group`, `remove-host-group`, `remove-rule-group`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Enable policy
+Invoke-FalconPreventionPolicyAction -Name enable -Id <policy_id>
+```
+
+```powershell Assign to host group
+Invoke-FalconPreventionPolicyAction -Name add-host-group -GroupId <group_id> -Id <policy_id>
+```
+
+```powershell Remove from host group
+Invoke-FalconPreventionPolicyAction -Name remove-host-group -GroupId <group_id> -Id <policy_id>
+```
+</CodeGroup>
+
+## Get Policy Members
+
+Search for members (hosts) assigned to Prevention policies.
+
+```powershell Get-FalconPreventionPolicyMember
+Get-FalconPreventionPolicyMember [[-Id] <string>] [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string">
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+Get-FalconPreventionPolicyMember -Id <policy_id> -Detailed -All
+```
+
+## Set Policy Precedence
+
+Set Prevention policy precedence order for a specific platform.
+
+```powershell Set-FalconPreventionPrecedence
+Set-FalconPreventionPrecedence -PlatformName <string> -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`, `iOS`, `Android`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifiers in desired precedence order (highest to lowest priority). Pattern: `^[a-fA-F0-9]{32}$`
+  
+  <Note>All policy identifiers must be supplied in order, with the exception of the `platform_default` policy.</Note>
+</ParamField>
+
+### Example
+
+```powershell
+$PolicyOrder = @('<policy_id_1>', '<policy_id_2>', '<policy_id_3>')
+Set-FalconPreventionPrecedence -PlatformName 'Windows' -Id $PolicyOrder
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Response Policies" icon="shield" href="/api/response-policies">
+    Manage Real-time Response policies
+  </Card>
+  <Card title="Sensor Update Policies" icon="arrow-up" href="/api/sensor-update-policies">
+    Control sensor version deployment
+  </Card>
+</CardGroup>

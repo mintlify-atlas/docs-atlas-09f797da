@@ -1,0 +1,640 @@
+---
+title: MSSP (Flight Control)
+description: Manage multi-tenant CrowdStrike environments with Falcon Flight Control
+icon: building
+---
+
+## Overview
+
+Falcon Flight Control enables Managed Security Service Providers (MSSPs) to efficiently manage multiple customer instances (CIDs) from a single parent CID. You can organize customers into groups, create user groups with specific access permissions, and control which users can access which customer environments.
+
+<Info>
+All Flight Control operations require **Flight Control: Read** or **Flight Control: Write** permissions.
+</Info>
+
+## Architecture
+
+Flight Control uses three core concepts:
+
+<CardGroup cols={3}>
+  <Card title="CID Groups" icon="folder-tree">
+    Collections of child CIDs organized by criteria (region, service tier, etc.)
+  </Card>
+  <Card title="User Groups" icon="users">
+    Collections of users who need similar access permissions
+  </Card>
+  <Card title="Group Roles" icon="link">
+    Assignments that link user groups to CID groups with specific roles
+  </Card>
+</CardGroup>
+
+## CID Group Management
+
+### Create CID Groups
+
+Organize your child CIDs into logical groups.
+
+```powershell Create CID Group
+New-FalconCidGroup -Name 'Enterprise Customers' -Description 'Large enterprise accounts with 1000+ endpoints'
+```
+
+<ParamField path="Name" type="string" required>
+CID group name
+</ParamField>
+
+<ParamField path="Description" type="string" required>
+CID group description
+</ParamField>
+
+### Get CID Groups
+
+Retrieve CID group information.
+
+```powershell List All CID Groups
+Get-FalconCidGroup -Detailed
+```
+
+```powershell Get Specific Group
+Get-FalconCidGroup -Id '12345678901234567890123456789012'
+```
+
+```powershell Search by Name
+Get-FalconCidGroup -Name 'Enterprise Customers' -Detailed
+```
+
+<ParamField path="Id" type="string[]">
+CID group identifier(s) - 32-character hexadecimal string
+</ParamField>
+
+<ParamField path="Name" type="string">
+Filter by CID group name
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `last_modified_timestamp.asc`, `last_modified_timestamp.desc`, `name.asc`, `name.desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+### Modify CID Groups
+
+```powershell Update Group
+Edit-FalconCidGroup -Id '12345678901234567890123456789012' -Name 'Premium Enterprise' -Description 'Updated description'
+```
+
+<ParamField path="Name" type="string">
+New CID group name
+</ParamField>
+
+<ParamField path="Description" type="string">
+New CID group description
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+CID group identifier to modify
+</ParamField>
+
+### Delete CID Groups
+
+```powershell Remove Group
+Remove-FalconCidGroup -Id '12345678901234567890123456789012'
+```
+
+<ParamField path="Id" type="string[]" required>
+CID group identifier(s) to remove
+</ParamField>
+
+## CID Group Members
+
+### Add Members to CID Groups
+
+Assign child CIDs to a group.
+
+```powershell Add Single CID
+Add-FalconCidGroupMember -Id '12345678901234567890123456789012' -Cid 'abcdef1234567890abcdef1234567890'
+```
+
+```powershell Add Multiple CIDs
+Add-FalconCidGroupMember -Id '12345678901234567890123456789012' -Cid @('abcdef1234567890abcdef1234567890', '1234567890abcdef1234567890abcdef')
+```
+
+<ParamField path="Id" type="string" required>
+CID group identifier
+</ParamField>
+
+<ParamField path="Cid" type="string[]" required>
+Child CID(s) to add to the group
+</ParamField>
+
+### Get CID Group Members
+
+```powershell List Members
+Get-FalconCidGroupMember -Cid 'abcdef1234567890abcdef1234567890' -Detailed
+```
+
+```powershell Get by Group ID
+Get-FalconCidGroupMember -Id '12345678901234567890123456789012'
+```
+
+<ParamField path="Id" type="string[]">
+CID group identifier(s)
+</ParamField>
+
+<ParamField path="Cid" type="string">
+Child CID to search for
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `last_modified_timestamp.asc`, `last_modified_timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+### Remove Members from CID Groups
+
+```powershell Remove CID from Group
+Remove-FalconCidGroupMember -Id '12345678901234567890123456789012' -Cid 'abcdef1234567890abcdef1234567890'
+```
+
+<ParamField path="Id" type="string" required>
+CID group identifier
+</ParamField>
+
+<ParamField path="Cid" type="string[]" required>
+Child CID(s) to remove from the group
+</ParamField>
+
+## User Group Management
+
+### Create User Groups
+
+Create groups for users with similar access needs.
+
+```powershell Create User Group
+New-FalconUserGroup -Name 'Tier 1 Analysts' -Description 'SOC analysts with basic access'
+```
+
+<ParamField path="Name" type="string" required>
+User group name
+</ParamField>
+
+<ParamField path="Description" type="string" required>
+User group description
+</ParamField>
+
+### Get User Groups
+
+```powershell List All User Groups
+Get-FalconUserGroup -Detailed
+```
+
+```powershell Get by Name
+Get-FalconUserGroup -Name 'Tier 1 Analysts' -Detailed
+```
+
+<ParamField path="Id" type="string[]">
+User group identifier(s)
+</ParamField>
+
+<ParamField path="Name" type="string">
+Filter by user group name
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `last_modified_timestamp.asc`, `last_modified_timestamp.desc`, `name.asc`, `name.desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+### Modify User Groups
+
+```powershell Update User Group
+Edit-FalconUserGroup -Id '12345678901234567890123456789012' -Name 'Senior Analysts' -Description 'Experienced SOC analysts'
+```
+
+<ParamField path="Name" type="string">
+New user group name
+</ParamField>
+
+<ParamField path="Description" type="string">
+New user group description
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+User group identifier
+</ParamField>
+
+### Delete User Groups
+
+```powershell Remove User Group
+Remove-FalconUserGroup -Id '12345678901234567890123456789012'
+```
+
+<ParamField path="Id" type="string[]" required>
+User group identifier(s) to remove
+</ParamField>
+
+## User Group Members
+
+### Add Users to Groups
+
+```powershell Add User
+Add-FalconUserGroupMember -Id '12345678901234567890123456789012' -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+```powershell Add Multiple Users
+Add-FalconUserGroupMember -Id '12345678901234567890123456789012' -UserId @('a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'b2c3d4e5-f6a7-8901-bcde-f12345678901')
+```
+
+<ParamField path="Id" type="string" required>
+User group identifier
+</ParamField>
+
+<ParamField path="UserId" type="string[]" required>
+User identifier(s) to add (UUID format)
+</ParamField>
+
+### Get User Group Members
+
+```powershell List Members of Group
+Get-FalconUserGroupMember -Id '12345678901234567890123456789012' -Detailed
+```
+
+```powershell Find Groups for User
+Get-FalconUserGroupMember -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+<ParamField path="Id" type="string[]">
+User group identifier(s) to get members from
+</ParamField>
+
+<ParamField path="UserId" type="string">
+User identifier to find group membership for
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `last_modified_timestamp.asc`, `last_modified_timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+### Remove Users from Groups
+
+```powershell Remove User
+Remove-FalconUserGroupMember -Id '12345678901234567890123456789012' -UserId 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+<ParamField path="Id" type="string" required>
+User group identifier
+</ParamField>
+
+<ParamField path="UserId" type="string[]" required>
+User identifier(s) to remove from group
+</ParamField>
+
+## Group Role Assignment
+
+### Assign Roles Between Groups
+
+Link user groups to CID groups with specific roles to grant permissions.
+
+```powershell Assign Role
+Add-FalconGroupRole -CidGroupId '12345678901234567890123456789012' -UserGroupId '98765432109876543210987654321098' -RoleId 'event_viewer'
+```
+
+```powershell Assign Multiple Roles
+Add-FalconGroupRole -CidGroupId '12345678901234567890123456789012' -UserGroupId '98765432109876543210987654321098' -RoleId @('event_viewer', 'detection_responder')
+```
+
+<ParamField path="CidGroupId" type="string" required>
+CID group identifier
+</ParamField>
+
+<ParamField path="UserGroupId" type="string" required>
+User group identifier
+</ParamField>
+
+<ParamField path="RoleId" type="string[]" required>
+Role identifier(s) to assign
+</ParamField>
+
+### Get Group Roles
+
+```powershell Get All Group Roles
+Get-FalconGroupRole -CidGroupId '12345678901234567890123456789012' -Detailed
+```
+
+```powershell Get by User Group
+Get-FalconGroupRole -UserGroupId '98765432109876543210987654321098' -Detailed
+```
+
+```powershell Get Specific Assignment
+Get-FalconGroupRole -Id '12345678901234567890123456789012:98765432109876543210987654321098'
+```
+
+<ParamField path="Id" type="string[]">
+Combined group identifier in format `<cid_group_id>:<user_group_id>`
+</ParamField>
+
+<ParamField path="CidGroupId" type="string">
+CID group identifier to filter by
+</ParamField>
+
+<ParamField path="UserGroupId" type="string">
+User group identifier to filter by
+</ParamField>
+
+<ParamField path="RoleId" type="string">
+Role identifier to filter by
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `last_modified_timestamp.asc`, `last_modified_timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+### Remove Group Roles
+
+```powershell Remove Specific Roles
+Remove-FalconGroupRole -CidGroupId '12345678901234567890123456789012' -UserGroupId '98765432109876543210987654321098' -RoleId 'temp_access'
+```
+
+```powershell Remove Entire Association
+Remove-FalconGroupRole -CidGroupId '12345678901234567890123456789012' -UserGroupId '98765432109876543210987654321098'
+```
+
+<ParamField path="CidGroupId" type="string" required>
+CID group identifier
+</ParamField>
+
+<ParamField path="UserGroupId" type="string" required>
+User group identifier
+</ParamField>
+
+<ParamField path="RoleId" type="string[]">
+Role identifier(s) to remove. If omitted, removes the entire user group/CID group association.
+</ParamField>
+
+## Member CID Management
+
+### Get Member CIDs
+
+Retrieve information about child CIDs.
+
+```powershell List All Member CIDs
+Get-FalconMemberCid -Detailed
+```
+
+```powershell Get Specific CID
+Get-FalconMemberCid -Id 'abcdef1234567890abcdef1234567890'
+```
+
+```powershell Filter Member CIDs
+Get-FalconMemberCid -Filter "name:*'Contoso'" -Detailed
+```
+
+<ParamField path="Id" type="string[]">
+Member CID identifier(s)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+Falcon Query Language expression to filter results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+Sort by: `last_modified_timestamp.asc`, `last_modified_timestamp.desc`
+</ParamField>
+
+<ParamField path="Limit" type="integer">
+Maximum results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="integer">
+Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+Repeat requests until all results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+Display total result count
+</ParamField>
+
+## MSSP Workflow Examples
+
+### Complete MSSP Setup
+
+Here's how to set up a complete Flight Control configuration:
+
+```powershell Full MSSP Configuration
+# Step 1: Create CID groups by region
+$UsWest = New-FalconCidGroup -Name 'US West Customers' -Description 'Customers in western United States'
+$UsEast = New-FalconCidGroup -Name 'US East Customers' -Description 'Customers in eastern United States'
+
+# Step 2: Add child CIDs to groups
+Add-FalconCidGroupMember -Id $UsWest.id -Cid @('cid1111111111111111111111111111', 'cid2222222222222222222222222222')
+Add-FalconCidGroupMember -Id $UsEast.id -Cid @('cid3333333333333333333333333333', 'cid4444444444444444444444444444')
+
+# Step 3: Create user groups by role
+$Tier1 = New-FalconUserGroup -Name 'Tier 1 SOC' -Description 'First-level SOC analysts'
+$Tier2 = New-FalconUserGroup -Name 'Tier 2 SOC' -Description 'Senior SOC analysts'
+
+# Step 4: Add users to groups
+$Analysts = Get-FalconUser -Filter "first_name:*'Analyst'"
+Add-FalconUserGroupMember -Id $Tier1.id -UserId $Analysts[0..4].uuid
+Add-FalconUserGroupMember -Id $Tier2.id -UserId $Analysts[5..9].uuid
+
+# Step 5: Assign roles to link user groups with CID groups
+Add-FalconGroupRole -CidGroupId $UsWest.id -UserGroupId $Tier1.id -RoleId 'event_viewer'
+Add-FalconGroupRole -CidGroupId $UsWest.id -UserGroupId $Tier2.id -RoleId @('event_viewer', 'detection_responder')
+Add-FalconGroupRole -CidGroupId $UsEast.id -UserGroupId $Tier1.id -RoleId 'event_viewer'
+Add-FalconGroupRole -CidGroupId $UsEast.id -UserGroupId $Tier2.id -RoleId @('event_viewer', 'detection_responder')
+
+# Step 6: Verify configuration
+Get-FalconGroupRole -CidGroupId $UsWest.id -Detailed
+```
+
+### Regional Access Management
+
+```powershell Regional Team Setup
+# Create regional CID groups
+$Emea = New-FalconCidGroup -Name 'EMEA Customers' -Description 'Europe, Middle East, and Africa'
+$Apac = New-FalconCidGroup -Name 'APAC Customers' -Description 'Asia-Pacific region'
+
+# Create regional user groups
+$EmeaTeam = New-FalconUserGroup -Name 'EMEA SOC Team' -Description 'Security analysts for EMEA region'
+$ApacTeam = New-FalconUserGroup -Name 'APAC SOC Team' -Description 'Security analysts for APAC region'
+
+# Assign regional users
+$EmeaUsers = Get-FalconUser -Filter "uid:*'@emea.company.com'"
+$ApacUsers = Get-FalconUser -Filter "uid:*'@apac.company.com'"
+
+Add-FalconUserGroupMember -Id $EmeaTeam.id -UserId $EmeaUsers.uuid
+Add-FalconUserGroupMember -Id $ApacTeam.id -UserId $ApacUsers.uuid
+
+# Link teams to their regions
+Add-FalconGroupRole -CidGroupId $Emea.id -UserGroupId $EmeaTeam.id -RoleId 'detection_responder'
+Add-FalconGroupRole -CidGroupId $Apac.id -UserGroupId $ApacTeam.id -RoleId 'detection_responder'
+```
+
+### Service Tier Management
+
+```powershell Service Tier Organization
+# Create CID groups by service tier
+$Premium = New-FalconCidGroup -Name 'Premium Support' -Description '24/7 premium support customers'
+$Standard = New-FalconCidGroup -Name 'Standard Support' -Description 'Business hours support customers'
+
+# Create specialized user groups
+$PremiumTeam = New-FalconUserGroup -Name 'Premium Support Team' -Description '24/7 on-call analysts'
+$StandardTeam = New-FalconUserGroup -Name 'Standard Support Team' -Description 'Business hours analysts'
+
+# Assign different permission levels
+Add-FalconGroupRole -CidGroupId $Premium.id -UserGroupId $PremiumTeam.id -RoleId @('detection_responder', 'real_time_responder')
+Add-FalconGroupRole -CidGroupId $Standard.id -UserGroupId $StandardTeam.id -RoleId 'event_viewer'
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Organize by Business Logic">
+    Create CID groups that match your business structure (region, service tier, industry) for easier management.
+  </Step>
+  <Step title="Use Descriptive Names">
+    Choose clear, descriptive names for groups that indicate their purpose and scope.
+  </Step>
+  <Step title="Implement Role Separation">
+    Create distinct user groups for different job functions and responsibility levels.
+  </Step>
+  <Step title="Regular Audits">
+    Periodically review group memberships and role assignments to ensure they remain appropriate.
+  </Step>
+  <Step title="Document Assignments">
+    Maintain documentation of your Flight Control configuration for compliance and knowledge transfer.
+  </Step>
+  <Step title="Test Before Deploying">
+    Test permission configurations with a small set of CIDs before rolling out to production.
+  </Step>
+</Steps>
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Multi-Region MSSP">
+    Organize by geography with regional CID groups (US, EMEA, APAC) and regional user groups, ensuring teams only access their designated regions.
+  </Accordion>
+  <Accordion title="Tiered Support Model">
+    Create CID groups by service level (Premium, Standard, Basic) and user groups by support tier (Tier 1, 2, 3), assigning escalating permissions.
+  </Accordion>
+  <Accordion title="Industry Segmentation">
+    Group customers by industry (Healthcare, Finance, Retail) with specialized analyst teams who understand industry-specific threats.
+  </Accordion>
+  <Accordion title="Partner/Reseller Model">
+    Create CID groups for each partner organization and user groups for their analysts, maintaining strict separation between partners.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<Card title="User Management" icon="users" href="/api/user-management">
+  Create and manage individual user accounts
+</Card>
+
+<Card title="Identity Protection" icon="fingerprint" href="/api/identity-protection">
+  Configure identity-based threat detection policies
+</Card>

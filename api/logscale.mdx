@@ -1,0 +1,445 @@
+---
+title: LogScale (Foundry)
+description: Falcon LogScale integration for event ingestion and saved search execution
+icon: chart-line
+---
+
+The LogScale API enables integration between PSFalcon and Falcon LogScale (formerly Humio) or Falcon NGSIEM for streaming security events and executing saved searches within Falcon Foundry applications.
+
+## Overview
+
+PSFalcon's LogScale integration provides:
+
+- **Event streaming**: Send PSFalcon command results to LogScale repositories
+- **Saved searches**: Execute queries and retrieve results from Falcon Foundry apps
+- **Repository discovery**: List available LogScale repositories and views
+- **Audit logging**: Track PSFalcon API activity in external log systems
+
+## Event Collector Configuration
+
+### Register LogScale destination
+
+```powershell Register-FalconEventCollector
+Register-FalconEventCollector -Uri <System.Uri> -Token <string> [-Enable <string[]>]
+```
+
+<ParamField path="Uri" type="System.Uri" required>
+  Falcon LogScale cloud or Falcon NGSIEM HEC ingestion URI. Supported formats:
+  - LogScale: `https://cloud.us.humio.com/` (token determines repository)
+  - NGSIEM: `https://ngsiem-instance.com:8088/services/collector/` (Splunk HEC endpoint)
+</ParamField>
+
+<ParamField path="Token" type="string" required>
+  Ingestion token:
+  - LogScale: 32-character hexadecimal token
+  - NGSIEM: UUID format HEC token
+</ParamField>
+
+<ParamField path="Enable" type="string[]">
+  Define which events to send to the collector. Options:
+  - `requests`: Log all API requests made by PSFalcon
+  - `responses`: Log all API responses received by PSFalcon
+</ParamField>
+
+**Example: Register LogScale endpoint**
+
+```powershell
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" -Enable requests,responses
+```
+
+**Example: Register NGSIEM endpoint**
+
+```powershell
+Register-FalconEventCollector -Uri "https://ngsiem.example.com:8088/services/collector/" -Token "12345678-1234-1234-1234-123456789abc" -Enable responses
+```
+
+<Note>
+Once configured, PSFalcon will automatically send enabled event types to the collector. The module will not send events until `Enable` options are chosen.
+</Note>
+
+### View current collector configuration
+
+```powershell Show-FalconEventCollector
+Show-FalconEventCollector
+```
+
+Displays the currently configured LogScale or NGSIEM endpoint, token, and enabled event types.
+
+**Example**
+
+```powershell
+Show-FalconEventCollector
+```
+
+**Output**
+```
+Uri    : https://cloud.us.humio.com/api/v1/ingest/humio-structured/
+Token  : a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+Enable : {requests, responses}
+```
+
+### Remove collector configuration
+
+```powershell Unregister-FalconEventCollector
+Unregister-FalconEventCollector
+```
+
+Removes the existing LogScale or NGSIEM configuration and stops event transmission.
+
+**Example**
+
+```powershell
+Unregister-FalconEventCollector
+```
+
+## Sending Events
+
+### Send custom events
+
+```powershell Send-FalconEvent
+Send-FalconEvent -Object <object>
+```
+
+<ParamField path="Object" type="object" required>
+  PSFalcon command output or custom object to send as an event
+</ParamField>
+
+Sends events to the configured LogScale or NGSIEM destination. Objects are automatically formatted based on the target platform.
+
+**Example: Send detection events**
+
+```powershell
+# Register collector first
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "your-token-here"
+
+# Get detections and send to LogScale
+Get-FalconDetection -Filter "status:'new'" -Detailed -All | Send-FalconEvent
+```
+
+**Example: Send host information**
+
+```powershell
+Get-FalconHost -Filter "platform_name:'Windows'" -Detailed -All | Send-FalconEvent
+```
+
+**Example: Send custom event**
+
+```powershell
+$CustomEvent = [PSCustomObject]@{
+    timestamp = Get-Date -Format o
+    event_type = "security_scan"
+    host_count = 150
+    status = "completed"
+    findings = 5
+}
+
+Send-FalconEvent -Object $CustomEvent
+```
+
+<Tip>
+Use pipeline to automatically stream any PSFalcon command results to LogScale:
+
+```powershell
+Get-FalconAlert -Filter "severity:['High','Critical']" -All | Send-FalconEvent
+```
+</Tip>
+
+## Falcon Foundry Integration
+
+### List available repositories
+
+```powershell Get-FalconFoundryRepository
+Get-FalconFoundryRepository [-CheckTestData <boolean>]
+```
+
+<ParamField path="CheckTestData" type="boolean">
+  Include whether test data is present in the application repository
+</ParamField>
+
+Lists available Falcon Foundry application repositories.
+
+**Example**
+
+```powershell
+Get-FalconFoundryRepository -CheckTestData $true
+```
+
+### List available views
+
+```powershell Get-FalconFoundryView
+Get-FalconFoundryView [-CheckTestData <boolean>]
+```
+
+<ParamField path="CheckTestData" type="boolean">
+  Include whether test data is present in the application repository
+</ParamField>
+
+Lists available Falcon Foundry views.
+
+**Example**
+
+```powershell
+Get-FalconFoundryView -CheckTestData $true
+```
+
+### Execute saved search
+
+```powershell Get-FalconFoundrySearch
+Get-FalconFoundrySearch -Id <string> [-AppId <string>] [-InferJsonTypes <boolean>] [-Limit <string>] [-MatchResponseSchema <boolean>] [-Metadata <boolean>] [-JobStatusOnly <boolean>] [-Offset <string>]
+```
+
+<ParamField path="Id" type="string" required>
+  Search identifier (job ID)
+</ParamField>
+
+<ParamField path="AppId" type="string">
+  Foundry application identifier
+</ParamField>
+
+<ParamField path="InferJsonTypes" type="boolean">
+  Whether to try to infer data types in JSON event response instead of returning map[string]string
+</ParamField>
+
+<ParamField path="Limit" type="string">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="MatchResponseSchema" type="boolean">
+  Whether to validate search results against their schema
+</ParamField>
+
+<ParamField path="Metadata" type="boolean">
+  Whether to include metadata in the response
+</ParamField>
+
+<ParamField path="JobStatusOnly" type="boolean">
+  Whether to include job status and remove results in the response
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results
+</ParamField>
+
+**Example: Execute saved search**
+
+```powershell
+# Get search results
+$Results = Get-FalconFoundrySearch -Id "saved-search-id" -Limit 100
+
+# Process results
+$Results | ForEach-Object {
+    Write-Host "Event: $($_.event_type) at $($_.timestamp)"
+}
+```
+
+**Example: Check search job status**
+
+```powershell
+Get-FalconFoundrySearch -Id "job-id" -JobStatusOnly $true
+```
+
+## Common Workflows
+
+### Stream API activity to LogScale
+
+```powershell
+# Register collector with API logging enabled
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "your-token" -Enable requests,responses
+
+# All subsequent PSFalcon commands will automatically log to LogScale
+Get-FalconDetection -Filter "status:'new'" -All
+Get-FalconHost -Filter "platform_name:'Linux'" -All
+
+# API requests and responses are now searchable in LogScale
+```
+
+### Audit security operations
+
+```powershell
+# Configure collector for response logging
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "your-token" -Enable responses
+
+# Perform security operations
+$Detections = Get-FalconDetection -Filter "severity:'Critical'" -Detailed -All
+
+foreach ($Detection in $Detections) {
+    # Update detection status
+    $Update = Edit-FalconDetection -Id $Detection.detection_id -Status in_progress
+    
+    # Each operation is logged to LogScale
+}
+
+# Query LogScale to audit all detection status changes
+```
+
+### Send scheduled reports
+
+```powershell
+# Register collector
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "your-token"
+
+# Generate daily security report
+$Report = [PSCustomObject]@{
+    report_date = Get-Date -Format "yyyy-MM-dd"
+    report_type = "daily_security_summary"
+    
+    # Get counts
+    new_detections = (Get-FalconDetection -Filter "created_timestamp:>'last 24 hours'" -Total)
+    critical_alerts = (Get-FalconAlert -Filter "severity:'Critical'+created_timestamp:>'last 24 hours'" -Total)
+    new_hosts = (Get-FalconHost -Filter "first_seen:>'last 24 hours'" -Total)
+    
+    # Get details
+    top_detections = Get-FalconDetection -Filter "created_timestamp:>'last 24 hours'" -Limit 10 -Detailed
+}
+
+# Send to LogScale
+Send-FalconEvent -Object $Report
+```
+
+### Export investigation data
+
+```powershell
+# Register collector
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "your-token"
+
+# Investigate an incident
+$IncidentId = "inc:abc123:1234567890"
+
+# Get all related data and send to LogScale for analysis
+Get-FalconIncident -Id $IncidentId -Detailed | Send-FalconEvent
+Get-FalconDetection -Filter "incident_id:'$IncidentId'" -Detailed -All | Send-FalconEvent
+Get-FalconAlert -Filter "incident_id:'$IncidentId'" -Detailed -All | Send-FalconEvent
+
+# Query LogScale to correlate and analyze incident timeline
+```
+
+### Monitor real-time events
+
+```powershell
+# Register collector for real-time monitoring
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token "your-token"
+
+# Continuous monitoring loop
+while ($true) {
+    # Get new detections in last minute
+    $Since = (Get-Date).AddMinutes(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    $NewDetections = Get-FalconDetection -Filter "created_timestamp:>'$Since'" -Detailed -All
+    
+    if ($NewDetections) {
+        # Send to LogScale
+        $NewDetections | Send-FalconEvent
+        
+        Write-Host "Sent $($NewDetections.Count) new detections to LogScale"
+    }
+    
+    # Wait before next check
+    Start-Sleep -Seconds 60
+}
+```
+
+### Integrate with Foundry apps
+
+```powershell
+# List available Foundry repositories
+$Repos = Get-FalconFoundryRepository -CheckTestData $true
+
+foreach ($Repo in $Repos) {
+    Write-Host "Repository: $($Repo.name)"
+    Write-Host "  Description: $($Repo.description)"
+    Write-Host "  Has test data: $($Repo.has_test_data)"
+}
+
+# List available views
+$Views = Get-FalconFoundryView -CheckTestData $true
+
+foreach ($View in $Views) {
+    Write-Host "View: $($View.name)"
+    Write-Host "  Repository: $($View.repository)"
+}
+```
+
+## Event Formats
+
+### LogScale Event Format
+
+```json
+[
+  {
+    "tags": {
+      "host": "workstation-01",
+      "source": "PSFalcon/2.2"
+    },
+    "events": [
+      {
+        "timestamp": "2024-01-15T10:30:00Z",
+        "attributes": {
+          "detection_id": "ldt:abc123:1234567890",
+          "severity": "Critical",
+          "status": "new"
+        }
+      }
+    ]
+  }
+]
+```
+
+### NGSIEM Event Format
+
+```json
+{
+  "event": {
+    "detection_id": "ldt:abc123:1234567890",
+    "severity": "Critical",
+    "status": "new"
+  },
+  "@timestamp": 1705315800000,
+  "@sourcetype": "PSFalcon/2.2"
+}
+```
+
+## Supported LogScale Clouds
+
+PSFalcon includes auto-completion for common LogScale cloud endpoints:
+
+- `https://cloud.community.humio.com/`
+- `https://cloud.humio.com/`
+- `https://cloud.us.humio.com/`
+
+For Falcon NGSIEM or on-premises LogScale, provide the full HEC ingestion URL.
+
+## Tips
+
+<Tip>
+**Enable Selective Logging**
+
+- Use `-Enable responses` for audit trails of what data was retrieved
+- Use `-Enable requests` for debugging API calls
+- Use `-Enable requests,responses` for complete API activity logging
+</Tip>
+
+<Tip>
+**Performance Considerations**
+
+- Sending large result sets can impact performance
+- Consider batching events or filtering to reduce volume
+- Use `-Limit` parameters to control result set sizes
+</Tip>
+
+<Note>
+Requires **App Logs: Read** permission for Foundry operations.
+
+Event collector configuration is stored in the current PSFalcon session and does not persist between PowerShell sessions.
+</Note>
+
+<Warning>
+Protect your ingestion tokens. Store them securely and never commit them to source control.
+
+```powershell
+# Use secure input
+$Token = Read-Host "Enter LogScale token" -AsSecureString
+$PlainToken = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($Token)
+)
+Register-FalconEventCollector -Uri "https://cloud.us.humio.com/" -Token $PlainToken
+```
+</Warning>

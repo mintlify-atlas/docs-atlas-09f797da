@@ -1,0 +1,498 @@
+---
+title: Device Control Policies
+description: Manage Device Control policies to restrict USB and Bluetooth device usage on endpoints
+---
+
+## Overview
+
+Device Control policies manage USB and Bluetooth device access on endpoints. These policies allow you to prevent data exfiltration and unauthorized device usage by controlling which types of devices can connect to your systems.
+
+<Info>
+**Required API Scope:** `Device control policies: Read` (for read operations) or `Device control policies: Write` (for write operations)
+</Info>
+
+## Get Device Control Policies
+
+Search for and retrieve Falcon Device Control policies.
+
+```powershell Get-FalconDeviceControlPolicy
+Get-FalconDeviceControlPolicy [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Include] <string[]>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Policy identifier(s). Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  Example: `platform_name:'Windows'+enabled:true`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Valid values: `created_by.asc`, `created_by.desc`, `created_timestamp.asc`, `created_timestamp.desc`, `enabled.asc`, `enabled.desc`, `modified_by.asc`, `modified_by.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`, `platform_name.asc`, `platform_name.desc`, `precedence.asc`, `precedence.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties
+  
+  Valid values: `members`
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get all policies
+Get-FalconDeviceControlPolicy -All -Detailed
+```
+
+```powershell Filter by platform
+Get-FalconDeviceControlPolicy -Filter "platform_name:'Windows'" -Detailed
+```
+
+```powershell Get specific policy with members
+Get-FalconDeviceControlPolicy -Id <policy_id> -Include members
+```
+</CodeGroup>
+
+## Create Device Control Policy
+
+Create new Falcon Device Control policies.
+
+```powershell New-FalconDeviceControlPolicy
+New-FalconDeviceControlPolicy -Name <string> -PlatformName <string> [[-Description] <string>] [[-UsbSetting] <object>] [[-BluetoothSetting] <object>]
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="UsbSetting" type="object">
+  USB settings configuration
+  
+  <Note>Default values will be supplied if omitted</Note>
+</ParamField>
+
+<ParamField path="BluetoothSetting" type="object">
+  Bluetooth settings configuration
+  
+  <Note>Default values will be supplied if omitted</Note>
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to create in a single request (for batch operations)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Create restrictive USB policy
+$UsbSettings = @{
+    enforcement_mode = 'BLOCK'
+    classes = @(
+        @{ class = 'mass_storage'; action = 'BLOCK' }
+    )
+}
+New-FalconDeviceControlPolicy -Name 'Restrict USB Storage' -PlatformName 'Windows' -Description 'Block USB storage devices' -UsbSetting $UsbSettings
+```
+
+```powershell Create policy with default settings
+New-FalconDeviceControlPolicy -Name 'Standard Device Control' -PlatformName 'Windows' -Description 'Default device control policy'
+```
+</CodeGroup>
+
+## Edit Device Control Policy
+
+Modify existing Falcon Device Control policies.
+
+```powershell Edit-FalconDeviceControlPolicy
+Edit-FalconDeviceControlPolicy -Id <string> [[-Name] <string>] [[-Description] <string>] [[-UsbSetting] <object>] [[-BluetoothSetting] <object>] [[-Propagated] <boolean>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Policy name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="UsbSetting" type="object">
+  USB settings to update
+</ParamField>
+
+<ParamField path="BluetoothSetting" type="object">
+  Bluetooth settings to update
+</ParamField>
+
+<ParamField path="Propagated" type="boolean">
+  Propagate policy to child environments
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to modify in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Update policy name
+Edit-FalconDeviceControlPolicy -Id <policy_id> -Name 'Updated Policy Name'
+```
+
+```powershell Update USB settings
+$UpdatedUsbSettings = @{
+    enforcement_mode = 'MONITOR'
+}
+Edit-FalconDeviceControlPolicy -Id <policy_id> -UsbSetting $UpdatedUsbSettings
+```
+</CodeGroup>
+
+## Remove Device Control Policy
+
+Remove Falcon Device Control policies.
+
+```powershell Remove-FalconDeviceControlPolicy
+Remove-FalconDeviceControlPolicy -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifier(s) to remove. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Example
+
+```powershell
+Remove-FalconDeviceControlPolicy -Id <policy_id>
+```
+
+## Policy Actions
+
+Perform actions on Falcon Device Control policies such as enabling/disabling or assigning to host groups.
+
+```powershell Invoke-FalconDeviceControlPolicyAction
+Invoke-FalconDeviceControlPolicyAction -Name <string> [[-GroupId] <string>] -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform
+  
+  Valid values: `add-host-group`, `disable`, `enable`, `remove-host-group`
+</ParamField>
+
+<ParamField path="GroupId" type="string">
+  Host group identifier. Pattern: `^[a-fA-F0-9]{32}$`
+  
+  Required for: `add-host-group`, `remove-host-group`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Enable policy
+Invoke-FalconDeviceControlPolicyAction -Name enable -Id <policy_id>
+```
+
+```powershell Assign to host group
+Invoke-FalconDeviceControlPolicyAction -Name add-host-group -GroupId <group_id> -Id <policy_id>
+```
+
+```powershell Remove from host group
+Invoke-FalconDeviceControlPolicyAction -Name remove-host-group -GroupId <group_id> -Id <policy_id>
+```
+</CodeGroup>
+
+## Get Policy Members
+
+Search for members (hosts) assigned to Device Control policies.
+
+```powershell Get-FalconDeviceControlPolicyMember
+Get-FalconDeviceControlPolicyMember [[-Id] <string>] [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string">
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+Get-FalconDeviceControlPolicyMember -Id <policy_id> -Detailed -All
+```
+
+## Set Policy Precedence
+
+Set Falcon Device Control policy precedence order for a specific platform.
+
+```powershell Set-FalconDeviceControlPrecedence
+Set-FalconDeviceControlPrecedence -PlatformName <string> -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifiers in desired precedence order (highest to lowest priority). Pattern: `^[a-fA-F0-9]{32}$`
+  
+  <Note>All policy identifiers must be supplied in order, with the exception of the `platform_default` policy.</Note>
+</ParamField>
+
+### Example
+
+```powershell
+$PolicyOrder = @('<policy_id_1>', '<policy_id_2>', '<policy_id_3>')
+Set-FalconDeviceControlPrecedence -PlatformName 'Windows' -Id $PolicyOrder
+```
+
+## Manage Device Classes
+
+Modify Device Control policy classes to control specific device types.
+
+```powershell Edit-FalconDeviceControlClass
+Edit-FalconDeviceControlClass -Id <string> [[-BluetoothClass] <object>] [[-UsbClass] <object>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="BluetoothClass" type="object">
+  Bluetooth class modifications and exceptions
+</ParamField>
+
+<ParamField path="UsbClass" type="object">
+  USB class modifications and exceptions
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policy identifiers and class objects to modify in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Example
+
+```powershell
+$UsbClasses = @{
+    classes = @(
+        @{ class = 'mass_storage'; action = 'BLOCK' },
+        @{ class = 'imaging'; action = 'ALLOW' }
+    )
+    exceptions = @(
+        @{ vendor_id = '0x1234'; product_id = '0x5678'; action = 'ALLOW' }
+    )
+}
+Edit-FalconDeviceControlClass -Id <policy_id> -UsbClass $UsbClasses
+```
+
+## Manage Default Notifications
+
+Modify default Device Control notification settings displayed to users.
+
+```powershell Get-FalconDeviceControlNotification
+Get-FalconDeviceControlNotification
+```
+
+```powershell Edit-FalconDeviceControlNotification
+Edit-FalconDeviceControlNotification -Bluetooth <object> -Usb <object>
+```
+
+### Parameters for Edit
+
+<ParamField path="Bluetooth" type="object" required>
+  Bluetooth custom notification settings
+  
+  Contains: `blocked_notification` with `use_custom` and `custom_message` properties
+</ParamField>
+
+<ParamField path="Usb" type="object" required>
+  USB custom notification settings
+  
+  Contains: `blocked_notification` and `restricted_notification`, each with `use_custom` and `custom_message` properties
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get default notifications
+Get-FalconDeviceControlNotification
+```
+
+```powershell Update notification messages
+$BluetoothNotifications = @{
+    blocked_notification = @{
+        use_custom = $true
+        custom_message = 'Bluetooth devices are not allowed on this system. Contact IT for assistance.'
+    }
+}
+
+$UsbNotifications = @{
+    blocked_notification = @{
+        use_custom = $true
+        custom_message = 'This USB device type is blocked by policy.'
+    }
+    restricted_notification = @{
+        use_custom = $true
+        custom_message = 'This USB device has restricted access.'
+    }
+}
+
+Edit-FalconDeviceControlNotification -Bluetooth $BluetoothNotifications -Usb $UsbNotifications
+```
+</CodeGroup>
+
+## Device Control Enforcement Modes
+
+Device Control policies support different enforcement modes:
+
+- **BLOCK**: Completely prevents device connections of specified types
+- **MONITOR**: Allows connections but logs device usage for visibility
+- **ALLOW**: Explicitly permits device types (used with exceptions)
+
+## Common USB Device Classes
+
+<AccordionGroup>
+  <Accordion title="Mass Storage">
+    USB flash drives, external hard drives, and other storage devices. Often blocked to prevent data exfiltration.
+  </Accordion>
+  
+  <Accordion title="Imaging">
+    Cameras, scanners, and webcams. May be restricted in secure environments.
+  </Accordion>
+  
+  <Accordion title="Wireless Controller">
+    Wireless keyboards, mice, and other input devices. Sometimes blocked due to keystroke injection risks.
+  </Accordion>
+  
+  <Accordion title="Portable Device">
+    Mobile phones and tablets connected via USB. Can be restricted to prevent unauthorized data transfer.
+  </Accordion>
+  
+  <Accordion title="Printer">
+    USB printers. May be controlled in environments with print security requirements.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Warning>
+Before deploying restrictive Device Control policies, ensure you:
+- Identify legitimate business needs for USB and Bluetooth devices
+- Create exceptions for approved devices using vendor/product IDs
+- Test policies in monitor mode before switching to block mode
+- Communicate policy changes to end users
+</Warning>
+
+<Steps>
+  <Step title="Start with Monitor Mode">
+    Deploy policies in monitor mode to understand device usage patterns without disrupting users
+  </Step>
+  <Step title="Analyze Device Usage">
+    Review logs to identify which devices are being used and by whom
+  </Step>
+  <Step title="Create Exceptions">
+    Add exceptions for approved devices before enforcing blocking
+  </Step>
+  <Step title="Enable Block Mode">
+    Switch to block mode and monitor for issues
+  </Step>
+  <Step title="Refine Policies">
+    Continuously adjust policies based on business needs and security requirements
+  </Step>
+</Steps>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Firewall Policies" icon="firewall" href="/api/firewall-policies">
+    Manage network firewall policies
+  </Card>
+  <Card title="Prevention Policies" icon="shield-halved" href="/api/prevention-policies">
+    Control malware prevention settings
+  </Card>
+</CardGroup>

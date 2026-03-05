@@ -1,0 +1,554 @@
+---
+title: Filtering with FQL
+description: Master Falcon Query Language (FQL) for precise, server-side filtering of API results
+icon: filter
+---
+
+## Overview
+
+Falcon Query Language (FQL) is a powerful filtering syntax used throughout the CrowdStrike Falcon platform. PSFalcon validates and supports FQL statements through the `-Filter` parameter on most query commands.
+
+## What is FQL?
+
+FQL allows you to:
+- Filter results server-side before they're returned
+- Reduce data transfer and improve performance
+- Create complex queries with multiple conditions
+- Use operators like wildcards, ranges, and negation
+
+<Note>
+  Server-side filtering with FQL is much more efficient than retrieving all results and filtering with PowerShell's `Where-Object`.
+</Note>
+
+## Basic FQL Syntax
+
+From `/home/daytona/workspace/source/private/Private.ps1:1186-1189`, FQL statements follow this pattern:
+
+```
+property:operator'value'
+```
+
+<CodeGroup>
+
+```powershell Exact Match
+# Find hosts with exact hostname
+Get-FalconHost -Filter "hostname:'DESKTOP-ABC123'"
+```
+
+```powershell Wildcard Match
+# Find hosts with hostname starting with DESKTOP-
+Get-FalconHost -Filter "hostname:'DESKTOP-*'"
+```
+
+```powershell Multiple Values (OR)
+# Find Windows or Linux hosts
+Get-FalconHost -Filter "platform_name:['Windows','Linux']"
+```
+
+```powershell Multiple Conditions (AND)
+# Find Windows hosts with normal status
+Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'"
+```
+
+</CodeGroup>
+
+## FQL Operators
+
+<AccordionGroup>
+  <Accordion title="Exact Match (:)">
+    Match exact value or use wildcards.
+    
+    ```powershell
+    # Exact match
+    Get-FalconHost -Filter "hostname:'DESKTOP-ABC123'"
+    
+    # Wildcard match
+    Get-FalconHost -Filter "hostname:'DESKTOP-*'"
+    Get-FalconHost -Filter "hostname:'*-ABC*'"
+    ```
+  </Accordion>
+  
+  <Accordion title="Negation (!)">
+    Exclude results matching the value.
+    
+    ```powershell
+    # Exclude specific platform
+    Get-FalconHost -Filter "!platform_name:'Windows'"
+    
+    # Exclude specific status
+    Get-FalconHost -Filter "!status:'contained'"
+    ```
+  </Accordion>
+  
+  <Accordion title="Greater Than (>)">
+    Match values greater than the specified value.
+    
+    ```powershell
+    # Hosts seen after a date
+    Get-FalconHost -Filter "last_seen:>'2024-01-01T00:00:00Z'"
+    
+    # Detection severity greater than 50
+    Get-FalconDetect -Filter "max_severity:>50"
+    ```
+  </Accordion>
+  
+  <Accordion title="Less Than (<)">
+    Match values less than the specified value.
+    
+    ```powershell
+    # Hosts seen before a date
+    Get-FalconHost -Filter "first_seen:<'2024-01-01T00:00:00Z'"
+    
+    # Low severity detections
+    Get-FalconDetect -Filter "max_severity:<30"
+    ```
+  </Accordion>
+  
+  <Accordion title="Greater Than or Equal (>=)">
+    Match values greater than or equal to the specified value.
+    
+    ```powershell
+    Get-FalconDetect -Filter "max_severity:>=70"
+    ```
+  </Accordion>
+  
+  <Accordion title="Less Than or Equal (<=)">
+    Match values less than or equal to the specified value.
+    
+    ```powershell
+    Get-FalconDetect -Filter "max_severity:<=30"
+    ```
+  </Accordion>
+  
+  <Accordion title="Pattern Match (~)">
+    Substring pattern matching.
+    
+    ```powershell
+    # Contains substring (case-insensitive)
+    Get-FalconHost -Filter "hostname:~'desktop'"
+    ```
+  </Accordion>
+  
+  <Accordion title="Negated Pattern (!~)">
+    Exclude substring pattern.
+    
+    ```powershell
+    # Does not contain substring
+    Get-FalconHost -Filter "hostname:!~'test'"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Combining Conditions
+
+### AND Operator (+)
+
+Combine multiple conditions that must all be true:
+
+```powershell
+# Windows hosts with normal status
+Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'"
+
+# Multiple AND conditions
+Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'+last_seen:>'2024-01-01T00:00:00Z'"
+
+# With wildcards
+Get-FalconHost -Filter "hostname:'DESKTOP-*'+platform_name:'Windows'"
+```
+
+### OR Operator (,)
+
+Match any of multiple values for a single property:
+
+```powershell
+# Multiple platforms (OR)
+Get-FalconHost -Filter "platform_name:['Windows','Linux','Mac']"
+
+# Multiple hostnames
+Get-FalconHost -Filter "hostname:['HOST1','HOST2','HOST3']"
+
+# Multiple statuses
+Get-FalconHost -Filter "status:['normal','containment_pending']"
+```
+
+### Complex Combinations
+
+Combine AND and OR logic:
+
+```powershell
+# (Windows OR Linux) AND normal status
+Get-FalconHost -Filter "platform_name:['Windows','Linux']+status:'normal'"
+
+# Multiple conditions with exclusions
+Get-FalconHost -Filter "platform_name:'Windows'+!status:'contained'+last_seen:>'2024-01-01T00:00:00Z'"
+```
+
+## Common Properties
+
+Frequently used properties for filtering hosts:
+
+<Accordion title="Host Properties">
+  | Property | Type | Example Values |
+  |----------|------|----------------|
+  | `hostname` | string | `'DESKTOP-ABC123'`, `'*-PROD-*'` |
+  | `platform_name` | string | `'Windows'`, `'Linux'`, `'Mac'` |
+  | `status` | string | `'normal'`, `'contained'`, `'containment_pending'` |
+  | `last_seen` | timestamp | `'2024-01-01T00:00:00Z'` |
+  | `first_seen` | timestamp | `'2024-01-01T00:00:00Z'` |
+  | `agent_version` | string | `'7.10.0'` |
+  | `os_version` | string | `'Windows 10'`, `'Ubuntu 20.04'` |
+  | `local_ip` | string | `'192.168.1.100'` |
+  | `external_ip` | string | `'1.2.3.4'` |
+  | `machine_domain` | string | `'WORKGROUP'`, `'corp.example.com'` |
+  | `site_name` | string | `'Default-First-Site-Name'` |
+  | `groups` | string | `'abc123...'` (host group ID) |
+</Accordion>
+
+## Date and Time Filtering
+
+Use RFC3339 format for timestamps:
+
+<CodeGroup>
+
+```powershell Specific Date
+# Hosts seen after January 1, 2024
+Get-FalconHost -Filter "last_seen:>'2024-01-01T00:00:00Z'"
+```
+
+```powershell Date Range
+# Hosts seen in January 2024
+Get-FalconHost -Filter "last_seen:>='2024-01-01T00:00:00Z'+last_seen:<'2024-02-01T00:00:00Z'"
+```
+
+```powershell Relative Time
+# Last 24 hours (PSFalcon converts this automatically)
+Get-FalconHost -Filter "last_seen:>'last 24 hours'"
+
+# Last 7 days
+Get-FalconHost -Filter "last_seen:>'last 7 days'"
+```
+
+</CodeGroup>
+
+From `/home/daytona/workspace/source/private/Private.ps1:180-191`, PSFalcon automatically converts relative time expressions:
+
+```powershell
+# These are converted to RFC3339 format automatically:
+'last 1 day'
+'last 7 days'
+'last 24 hours'
+'last 1 hour'
+```
+
+## Wildcards
+
+Use `*` for wildcard matching:
+
+<CodeGroup>
+
+```powershell Prefix Match
+# Hostnames starting with DESKTOP-
+Get-FalconHost -Filter "hostname:'DESKTOP-*'"
+```
+
+```powershell Suffix Match
+# Hostnames ending with -PROD
+Get-FalconHost -Filter "hostname:'*-PROD'"
+```
+
+```powershell Contains
+# Hostnames containing SERVER
+Get-FalconHost -Filter "hostname:'*SERVER*'"
+```
+
+```powershell Multiple Wildcards
+# Complex pattern
+Get-FalconHost -Filter "hostname:'WIN-*-PROD-*'"
+```
+
+</CodeGroup>
+
+## FQL Validation
+
+From `/home/daytona/workspace/source/private/Private.ps1:1182-1197`, PSFalcon validates FQL syntax before submission:
+
+```powershell
+# Valid FQL
+Get-FalconHost -Filter "hostname:'DESKTOP-*'"  # OK
+
+# Invalid FQL (missing operator)
+Get-FalconHost -Filter "hostname"
+# Error: 'hostname' is not a valid Falcon Query Language statement
+
+# Invalid FQL (incorrect syntax)
+Get-FalconHost -Filter "hostname=DESKTOP-123"
+# Error: 'hostname=DESKTOP-123' is not a valid Falcon Query Language statement
+```
+
+The validation pattern checks for:
+- Property name: `[\w\.]+`
+- Operator: `:`, `!`, `~`, `!~`, `>`, `<`, `>=`, `<=`
+- Value: `[\w\d\s\.\-\*\[\]\\,'":]+`
+
+## Practical Examples
+
+<CodeGroup>
+
+```powershell Find Offline Hosts
+# Hosts not seen in 30 days
+Get-FalconHost -Filter "last_seen:<'last 30 days'" -All
+```
+
+```powershell Find Production Windows Servers
+# Combine multiple conditions
+Get-FalconHost -Filter "platform_name:'Windows'+hostname:'*-PROD-*'+status:'normal'" -All
+```
+
+```powershell Find Hosts in Specific Subnet
+# Local IP in 192.168.1.x range
+Get-FalconHost -Filter "local_ip:'192.168.1.*'" -All
+```
+
+```powershell Find Hosts Missing Recent Updates
+# Specific agent version
+Get-FalconHost -Filter "!agent_version:'7.10.*'" -All
+```
+
+```powershell Find High Severity Detections
+# Detections with severity >= 70
+Get-FalconDetect -Filter "max_severity:>=70+status:'new'" -All
+```
+
+```powershell Find Hosts in Multiple Groups
+# Use group IDs
+$GroupIds = @('abc123...', 'def456...')
+Get-FalconHost -Filter "groups:[$($GroupIds -join ',')]" -All
+```
+
+</CodeGroup>
+
+## Server-Side vs Client-Side Filtering
+
+<Note>
+  Always prefer FQL (server-side) filtering over PowerShell `Where-Object` (client-side) filtering.
+</Note>
+
+<CodeGroup>
+
+```powershell Good: Server-Side (FQL)
+# Efficient: Only retrieves Windows hosts from API
+Get-FalconHost -Filter "platform_name:'Windows'" -All
+```
+
+```powershell Bad: Client-Side
+# Inefficient: Retrieves ALL hosts, then filters locally
+Get-FalconHost -All | Where-Object { $_.platform_name -eq 'Windows' }
+```
+
+</CodeGroup>
+
+Benefits of server-side filtering:
+- Reduced data transfer
+- Faster execution
+- Lower memory usage
+- Respects API rate limits better
+
+## Combining Filter with Other Parameters
+
+```powershell
+# Filter + Sort + Limit
+Get-FalconHost -Filter "platform_name:'Windows'" -Sort 'hostname.asc' -Limit 100
+
+# Filter + Detailed + All
+Get-FalconHost -Filter "status:'normal'" -Detailed -All
+
+# Filter + Include additional data
+Get-FalconHost -Filter "hostname:'DESKTOP-*'" -Include 'login_history' -Detailed -All
+```
+
+## Escaping Special Characters
+
+When filtering on values with special characters:
+
+```powershell
+# Backslash in domain names
+Get-FalconHost -Filter "machine_domain:'CORP.EXAMPLE.COM'"
+
+# Single quotes in values (use double quotes for outer string)
+Get-FalconHost -Filter "hostname:'O''Brien-PC'"
+
+# Spaces in values
+Get-FalconHost -Filter "os_version:'Windows 10'"
+```
+
+## Debugging FQL Queries
+
+Use `-Verbose` to see the actual query sent to the API:
+
+```powershell
+Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'" -Limit 5 -Verbose
+
+# Verbose output shows:
+# - The endpoint being called
+# - Query parameters including the filter
+# - Response metadata
+```
+
+## Common FQL Patterns
+
+<Accordion title="Pattern Library">
+  ```powershell
+  # Active hosts (seen in last 24 hours)
+  "last_seen:>'last 24 hours'"
+  
+  # Stale hosts (not seen in 90 days)
+  "last_seen:<'last 90 days'"
+  
+  # Production servers
+  "hostname:'*-PROD-*'"
+  
+  # Non-production environments
+  "hostname:['*-DEV-*','*-TEST-*','*-QA-*']"
+  
+  # Specific platforms
+  "platform_name:['Windows','Linux']"
+  
+  # Contained or pending containment
+  "status:['contained','containment_pending']"
+  
+  # Recent first_seen (new devices)
+  "first_seen:>'last 7 days'"
+  
+  # Specific domain
+  "machine_domain:'corp.example.com'"
+  
+  # Outside corporate network
+  "!local_ip:['10.*','172.16.*','192.168.*']"
+  
+  # Outdated agent versions
+  "!agent_version:>'7.0.0'"
+  ```
+</Accordion>
+
+## Field-Specific Considerations
+
+### Group Filtering
+
+From `/home/daytona/workspace/source/samples/devices/output-devices-with-their-most-recent-login.ps1:12`:
+
+```powershell
+# Filter by host group ID (use single quotes around ID)
+Get-FalconHost -Filter "groups:['abc123def456789012345678901234ab']" -All
+
+# Multiple groups (OR)
+Get-FalconHost -Filter "groups:['group-id-1','group-id-2']" -All
+```
+
+### IP Address Filtering
+
+```powershell
+# Exact IP
+Get-FalconHost -Filter "local_ip:'192.168.1.100'"
+
+# IP range with wildcard
+Get-FalconHost -Filter "local_ip:'192.168.1.*'"
+
+# Multiple IPs
+Get-FalconHost -Filter "local_ip:['192.168.1.100','192.168.1.101']"
+```
+
+### Version Filtering
+
+```powershell
+# Exact version
+Get-FalconHost -Filter "agent_version:'7.10.0'"
+
+# Version prefix (all 7.10.x)
+Get-FalconHost -Filter "agent_version:'7.10.*'"
+
+# Exclude old versions
+Get-FalconHost -Filter "!agent_version:'6.*'"
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Use FQL When Available">
+    Server-side filtering is more efficient than client-side.
+    
+    ```powershell
+    # Good
+    Get-FalconHost -Filter "platform_name:'Windows'" -All
+    
+    # Avoid
+    Get-FalconHost -All | Where-Object { $_.platform_name -eq 'Windows' }
+    ```
+  </Step>
+  
+  <Step title="Start Broad, Then Narrow">
+    Test filters incrementally:
+    
+    ```powershell
+    # 1. Check total count
+    Get-FalconHost -Filter "platform_name:'Windows'" -Total
+    
+    # 2. Add more conditions
+    Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'" -Total
+    
+    # 3. Retrieve full results
+    Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'" -All
+    ```
+  </Step>
+  
+  <Step title="Use Wildcards Carefully">
+    Leading wildcards can be slower:
+    
+    ```powershell
+    # Faster: prefix match
+    Get-FalconHost -Filter "hostname:'DESKTOP-*'"
+    
+    # Slower: leading wildcard
+    Get-FalconHost -Filter "hostname:'*-DESKTOP'"
+    ```
+  </Step>
+  
+  <Step title="Validate Before Large Queries">
+    Test FQL syntax with small limits first:
+    
+    ```powershell
+    # Test query
+    Get-FalconHost -Filter "complex+query+here" -Limit 5
+    
+    # If successful, run full query
+    Get-FalconHost -Filter "complex+query+here" -All
+    ```
+  </Step>
+  
+  <Step title="Combine with PowerShell When Needed">
+    Use FQL for properties the API supports, PowerShell for complex client-side logic:
+    
+    ```powershell
+    # Server-side filter for platform, client-side for complex logic
+    Get-FalconHost -Filter "platform_name:'Windows'" -All | 
+        Where-Object { 
+            $_.hostname -match '^[A-Z]{3}-\d{4}' -and
+            $_.agent_version -gt '7.0.0'
+        }
+    ```
+  </Step>
+</Steps>
+
+## FQL Reference by Endpoint
+
+Different endpoints support different filterable properties. Consult the CrowdStrike API documentation or use the Falcon console's filter builder to discover available properties for each endpoint.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pagination" icon="arrows-left-right" href="/core/pagination">
+    Combine filtering with pagination to efficiently retrieve large datasets
+  </Card>
+  <Card title="Authentication" icon="key" href="/core/authentication">
+    Understand authentication requirements for query operations
+  </Card>
+</CardGroup>

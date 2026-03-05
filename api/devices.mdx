@@ -1,0 +1,290 @@
+---
+title: Devices
+description: Host and device management cmdlets
+---
+
+## Get-FalconHost
+
+Search for hosts in your environment.
+
+```powershell
+Get-FalconHost [[-Filter] <String>] [[-Sort] <String>] [[-Limit] <Int32>] [[-Include] <String[]>] [[-Field] <String[]>] [[-Offset] <String>] [-Hidden] [-Detailed] [-All] [-Total]
+Get-FalconHost -Id <String[]> [-Login] [-Network] [-State] [-Include <String[]>]
+```
+
+<ParamField path="Id" type="string[]">
+  Host identifier(s) to retrieve specific device details
+  
+  **Aliases:** `ids`, `device_id`, `host_ids`, `aid`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  **Example:** `hostname:'*DESKTOP*'+platform_name:'Windows'`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  **Valid values:** `device_id.asc`, `device_id.desc`, `hostname.asc`, `hostname.desc`, `first_seen.asc`, `first_seen.desc`, `last_seen.asc`, `last_seen.desc`, `platform_name.asc`, `platform_name.desc`, and more
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-10000, default: 100)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties in the response
+  
+  **Valid values:** `content_state`, `group_names`, `login_history`, `network_history`, `online_state`, `policy_names`, `zero_trust_assessment`
+</ParamField>
+
+<ParamField path="Offset" type="string">
+  Position to begin retrieving results (pagination token)
+</ParamField>
+
+<ParamField path="Field" type="string[]">
+  Specific host properties to include in the response (when using `-Detailed`)
+</ParamField>
+
+<ParamField path="Hidden" type="switch">
+  Restrict search to 'hidden' hosts
+</ParamField>
+
+<ParamField path="Login" type="switch">
+  Retrieve user login history for specified hosts
+</ParamField>
+
+<ParamField path="Network" type="switch">
+  Retrieve network address history for specified hosts
+</ParamField>
+
+<ParamField path="State" type="switch">
+  Retrieve online status for specified hosts
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information for hosts
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Required Permission:** `Hosts: Read` (plus related permissions for specific `Include` selections)
+
+### Examples
+
+<CodeGroup>
+```powershell Basic Search
+# Get all Windows hosts
+Get-FalconHost -Filter "platform_name:'Windows'" -All
+
+# Get detailed information for all hosts
+Get-FalconHost -Detailed -All
+
+# Get hosts with additional properties
+Get-FalconHost -Include group_names,policy_names -All
+```
+
+```powershell Specific Host
+# Get details for a specific host by ID
+Get-FalconHost -Id "abc123def456..."
+
+# Get online status for multiple hosts
+Get-FalconHost -Id "abc123def456...","def456ghi789..." -State
+
+# Get login history for a host
+Get-FalconHost -Id "abc123def456..." -Login
+```
+
+```powershell Advanced Queries
+# Search hosts and include Zero Trust Assessment
+Get-FalconHost -Filter "last_seen:>='2024-01-01'" -Include zero_trust_assessment -Detailed
+
+# Get hosts with specific fields only
+Get-FalconHost -Filter "platform_name:'Linux'" -Detailed -Field hostname,device_id,os_version
+```
+</CodeGroup>
+
+---
+
+## Invoke-FalconHostAction
+
+Perform containment and visibility actions on hosts.
+
+```powershell
+Invoke-FalconHostAction -Name <String> [-Include <String[]>] -Id <String[]>
+```
+
+<ParamField path="Name" type="string" required>
+  Action to perform on the host(s)
+  
+  **Valid values:**
+  - `contain` - Network contain the host
+  - `lift_containment` - Release network containment
+  - `hide_host` - Hide host from console
+  - `unhide_host` - Unhide host in console
+  - `detection_suppress` - Suppress detections on host
+  - `detection_unsuppress` - Unsuppress detections on host
+  - `lift_filesystem_containment_all` - Release filesystem containment
+  
+  **Aliases:** `action_name`
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional host properties in the response
+  
+  **Valid values:** `agent_version`, `cid`, `external_ip`, `filesystem_containment_status`, `first_seen`, `host_hidden_status`, `hostname`, `last_seen`, `local_ip`, `mac_address`, `os_build`, `os_version`, `platform_name`, `product_type`, `product_type_desc`, `reduced_functionality_mode`, `serial_number`, `system_manufacturer`, `system_product_name`, `tags`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to perform the action on
+  
+  **Aliases:** `ids`, `device_id`
+</ParamField>
+
+**Required Permission:** `Hosts: Write` (plus related permissions for specific `Include` selections)
+
+### Examples
+
+<CodeGroup>
+```powershell Containment
+# Network contain a host
+Invoke-FalconHostAction -Name contain -Id "abc123def456..."
+
+# Lift network containment
+Invoke-FalconHostAction -Name lift_containment -Id "abc123def456..."
+
+# Contain multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Invoke-FalconHostAction -Name contain -Id $HostIds
+```
+
+```powershell Visibility
+# Hide a host from the console
+Invoke-FalconHostAction -Name hide_host -Id "abc123def456..."
+
+# Unhide a host
+Invoke-FalconHostAction -Name unhide_host -Id "abc123def456..."
+```
+
+```powershell Detection Management
+# Suppress detections on a host
+Invoke-FalconHostAction -Name detection_suppress -Id "abc123def456..."
+
+# Unsuppress detections
+Invoke-FalconHostAction -Name detection_unsuppress -Id "abc123def456..."
+
+# Include additional properties in response
+Invoke-FalconHostAction -Name contain -Id "abc123def456..." -Include hostname,os_version,tags
+```
+</CodeGroup>
+
+---
+
+## Add-FalconGroupingTag
+
+Add FalconGroupingTags to hosts.
+
+```powershell
+Add-FalconGroupingTag -Tag <String[]> -Id <String[]>
+```
+
+<ParamField path="Tag" type="string[]" required>
+  FalconGroupingTag value(s) to add (must start with `FalconGroupingTags/`)
+  
+  **Pattern:** `FalconGroupingTags/<string>`  
+  **Valid characters:** Letters, numbers, hyphens, underscores, forward slashes
+  
+  **Aliases:** `Tags`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to tag
+  
+  **Aliases:** `device_ids`, `device_id`, `ids`
+</ParamField>
+
+**Required Permission:** `Hosts: Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Add Tags
+# Add a single tag to a host
+Add-FalconGroupingTag -Tag "FalconGroupingTags/Production" -Id "abc123def456..."
+
+# Add multiple tags to a host
+Add-FalconGroupingTag -Tag "FalconGroupingTags/Production","FalconGroupingTags/WebServer" -Id "abc123def456..."
+
+# Add tags to multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Add-FalconGroupingTag -Tag "FalconGroupingTags/Database" -Id $HostIds
+```
+
+```powershell Pipeline Usage
+# Tag hosts from search results
+Get-FalconHost -Filter "platform_name:'Linux'" | Add-FalconGroupingTag -Tag "FalconGroupingTags/LinuxServers"
+
+# Tag hosts in a specific group
+Get-FalconHostGroupMember -Id "group123..." | Add-FalconGroupingTag -Tag "FalconGroupingTags/Critical"
+```
+</CodeGroup>
+
+<Note>
+FalconGroupingTags are visible tags that can be used for grouping and filtering hosts. They persist across sensor reinstalls and are visible in the Falcon console.
+</Note>
+
+---
+
+## Remove-FalconGroupingTag
+
+Remove FalconGroupingTags from hosts.
+
+```powershell
+Remove-FalconGroupingTag -Tag <String[]> -Id <String[]>
+```
+
+<ParamField path="Tag" type="string[]" required>
+  FalconGroupingTag value(s) to remove (must start with `FalconGroupingTags/`)
+  
+  **Pattern:** `FalconGroupingTags/<string>`  
+  **Valid characters:** Letters, numbers, hyphens, underscores, forward slashes
+  
+  **Aliases:** `Tags`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Host identifier(s) to remove tags from
+  
+  **Aliases:** `device_ids`, `device_id`, `ids`
+</ParamField>
+
+**Required Permission:** `Hosts: Write`
+
+### Examples
+
+<CodeGroup>
+```powershell Remove Tags
+# Remove a tag from a host
+Remove-FalconGroupingTag -Tag "FalconGroupingTags/Production" -Id "abc123def456..."
+
+# Remove multiple tags from a host
+Remove-FalconGroupingTag -Tag "FalconGroupingTags/Production","FalconGroupingTags/WebServer" -Id "abc123def456..."
+
+# Remove tag from multiple hosts
+$HostIds = @("abc123def456...","def456ghi789...")
+Remove-FalconGroupingTag -Tag "FalconGroupingTags/Decommissioned" -Id $HostIds
+```
+
+```powershell Pipeline Usage
+# Remove tag from all hosts in a group
+Get-FalconHostGroupMember -Id "group123..." | Remove-FalconGroupingTag -Tag "FalconGroupingTags/Testing"
+```
+</CodeGroup>

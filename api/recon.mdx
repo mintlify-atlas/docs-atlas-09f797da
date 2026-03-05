@@ -1,0 +1,538 @@
+---
+title: Recon
+description: Falcon Intelligence Recon monitoring rules, notifications, and exposed data records
+icon: radar
+---
+
+The Recon API provides access to Falcon Intelligence Recon capabilities, enabling monitoring of external threat intelligence sources for brand protection, credential leaks, and domain reconnaissance.
+
+## Overview
+
+Falcon Intelligence Recon helps organizations monitor the dark web, paste sites, and other external sources for:
+
+- **Exposed credentials**: Leaked usernames, passwords, and authentication data
+- **Brand monitoring**: Typosquatting, phishing, and impersonation
+- **Data breaches**: Compromised customer or employee information
+- **Third-party risks**: Supply chain and vendor exposure
+
+Monitoring rules trigger notifications when threats are detected, with configurable actions for alerting and response.
+
+## Monitoring Rules
+
+### Search for monitoring rules
+
+```powershell Get-FalconReconRule
+Get-FalconReconRule [-Filter <string>] [-Query <string>] [-Sort <string>] [-SecondarySort <string>] [-Limit <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string" query>
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Options: `created_timestamp|asc`, `created_timestamp|desc`, `last_updated_timestamp|asc`, `last_updated_timestamp|desc`
+</ParamField>
+
+<ParamField path="SecondarySort" type="string">
+  Secondary sort property and direction
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Example: List all high-priority monitoring rules**
+
+```powershell
+Get-FalconReconRule -Filter "priority:'high'" -Detailed -All
+```
+
+### Get rule details by ID
+
+```powershell
+Get-FalconReconRule -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Monitoring rule identifier(s)
+</ParamField>
+
+### Create a monitoring rule
+
+```powershell New-FalconReconRule
+New-FalconReconRule -Name <string> -Topic <string> -Filter <string> -Priority <string> -Permission <string> [-BreachMonitoring <boolean>] [-BreachMonitorOnly <boolean>] [-SubstringMatching <boolean>] [-MatchOnTsqResultType <string[]>] [-OriginatingTemplateId <string>]
+```
+
+<ParamField path="Name" type="string" required>
+  Monitoring rule name
+</ParamField>
+
+<ParamField path="Topic" type="string" required>
+  Monitoring rule topic. Options: `SA_ALIAS`, `SA_AUTHOR`, `SA_BIN`, `SA_BRAND_PRODUCT`, `SA_CUSTOM`, `SA_CVE`, `SA_DOMAIN`, `SA_EMAIL`, `SA_IP`, `SA_THIRD_PARTY`, `SA_VIP`
+</ParamField>
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language expression to define what to monitor
+</ParamField>
+
+<ParamField path="Priority" type="string" required>
+  Monitoring rule priority: `high`, `medium`, or `low`
+</ParamField>
+
+<ParamField path="Permission" type="string" required>
+  Permission level: `public` (All Intel users) or `private` (Recon Admins)
+</ParamField>
+
+<ParamField path="BreachMonitoring" type="boolean">
+  Monitor for breach data
+</ParamField>
+
+<ParamField path="BreachMonitorOnly" type="boolean">
+  Monitor only for breach data (requires BreachMonitoring: True)
+</ParamField>
+
+<ParamField path="SubstringMatching" type="boolean">
+  Monitor for substring matches (Typosquatting topic only)
+</ParamField>
+
+<ParamField path="MatchOnTsqResultType" type="string[]">
+  Monitor for `basedomains` and/or `subdomains` (Typosquatting topic only)
+</ParamField>
+
+<ParamField path="OriginatingTemplateId" type="string">
+  Identifier of originating rule template, if based on one
+</ParamField>
+
+**Example: Create a domain monitoring rule**
+
+```powershell
+New-FalconReconRule -Name "Monitor Company Domains" -Topic SA_DOMAIN -Filter "domain:*'example.com'" -Priority high -Permission private -BreachMonitoring $true
+```
+
+### Modify a monitoring rule
+
+```powershell Edit-FalconReconRule
+Edit-FalconReconRule -Id <string> -Name <string> -Filter <string> -Priority <string> -Permission <string> [-BreachMonitoring <boolean>] [-BreachMonitorOnly <boolean>] [-SubstringMatching <boolean>] [-MatchOnTsqResultType <string[]>]
+```
+
+<ParamField path="Id" type="string" required>
+  Monitoring rule identifier
+</ParamField>
+
+<ParamField path="Name" type="string" required>
+  Updated monitoring rule name
+</ParamField>
+
+<ParamField path="Filter" type="string" required>
+  Updated monitoring rule filter
+</ParamField>
+
+<ParamField path="Priority" type="string" required>
+  Updated priority: `high`, `medium`, or `low`
+</ParamField>
+
+<ParamField path="Permission" type="string" required>
+  Updated permission level: `public` or `private`
+</ParamField>
+
+### Delete monitoring rules
+
+```powershell Remove-FalconReconRule
+Remove-FalconReconRule -Id <string[]> [-DeleteNotification <boolean>]
+```
+
+<ParamField path="Id" type="string[]" required>
+  Monitoring rule identifier(s)
+</ParamField>
+
+<ParamField path="DeleteNotification" type="boolean">
+  Delete notifications generated by rule(s)
+</ParamField>
+
+### Preview rule notifications
+
+```powershell Get-FalconReconRulePreview
+Get-FalconReconRulePreview -Topic <string> -Filter <string>
+```
+
+<ParamField path="Topic" type="string" required>
+  Monitoring rule topic
+</ParamField>
+
+<ParamField path="Filter" type="string" required>
+  Monitoring rule filter to preview
+</ParamField>
+
+**Example: Preview notification count**
+
+```powershell
+Get-FalconReconRulePreview -Topic SA_EMAIL -Filter "email:*'@example.com'"
+```
+
+## Notifications
+
+### Search for notifications
+
+```powershell Get-FalconReconNotification
+Get-FalconReconNotification [-Filter <string>] [-Query <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total] [-Intel] [-Translate] [-Combined]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string" query>
+  Perform a generic substring search
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Options: `created_date|asc`, `created_date|desc`, `updated_date|asc`, `updated_date|desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Intel" type="switch">
+  Include raw intelligence content
+</ParamField>
+
+<ParamField path="Translate" type="switch">
+  Translate to English
+</ParamField>
+
+<ParamField path="Combined" type="switch">
+  Include raw intelligence content and translate to English
+</ParamField>
+
+**Example: Get recent high-priority notifications**
+
+```powershell
+Get-FalconReconNotification -Filter "rule.priority:'high'+created_date:>'2024-01-01'" -Sort "created_date|desc" -Detailed -All
+```
+
+### Get notification details by ID
+
+```powershell
+Get-FalconReconNotification -Id <string[]> [-Intel] [-Translate] [-Combined]
+```
+
+<ParamField path="Id" type="string[]" required>
+  Notification identifier(s)
+</ParamField>
+
+### Modify notification status
+
+```powershell Edit-FalconReconNotification
+Edit-FalconReconNotification -Id <string> -Status <string> -AssignedToUuid <string> [-Message <string>] [-IdpSendStatus <string>]
+```
+
+<ParamField path="Id" type="string" required>
+  Notification identifier
+</ParamField>
+
+<ParamField path="Status" type="string" required>
+  Notification status: `new`, `in-progress`, `closed-false-positive`, or `closed-true-positive`
+</ParamField>
+
+<ParamField path="AssignedToUuid" type="string" required>
+  User identifier to assign the notification to
+</ParamField>
+
+<ParamField path="Message" type="string">
+  Optional message or note
+</ParamField>
+
+**Example: Assign and close a notification**
+
+```powershell
+Edit-FalconReconNotification -Id "abc123" -Status closed-true-positive -AssignedToUuid "user-uuid-here" -Message "Confirmed credential leak, reset performed"
+```
+
+### Delete notifications
+
+```powershell
+Remove-FalconReconNotification -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Notification identifier(s)
+</ParamField>
+
+## Exposed Data Records
+
+### Search for exposed data records
+
+```powershell Get-FalconReconRecord
+Get-FalconReconRecord [-Filter <string>] [-Query <string>] [-Sort <string>] [-Limit <int>] [-Offset <int>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string" query>
+  Perform a generic substring search
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+**Example: Search for records by domain**
+
+```powershell
+Get-FalconReconRecord -Filter "email_domain:'example.com'" -Detailed -All
+```
+
+### Get record details by ID
+
+```powershell
+Get-FalconReconRecord -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Exposed data record identifier(s)
+</ParamField>
+
+## Rule Actions
+
+### Search for actions
+
+```powershell Get-FalconReconAction
+Get-FalconReconAction [-Filter <string>] [-Query <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+### Get action details by ID
+
+```powershell
+Get-FalconReconAction -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Action identifier(s)
+</ParamField>
+
+### Create a rule action
+
+```powershell New-FalconReconAction
+New-FalconReconAction -RuleId <string> -Type <string> -Frequency <string> -Recipient <string[]> [-ContentFormat <string>] [-TriggerMatchless <boolean>]
+```
+
+<ParamField path="RuleId" type="string" required>
+  Monitoring rule identifier
+</ParamField>
+
+<ParamField path="Type" type="string" required>
+  Notification type: `email`
+</ParamField>
+
+<ParamField path="Frequency" type="string" required>
+  Notification frequency: `asap`, `daily`, or `weekly`
+</ParamField>
+
+<ParamField path="Recipient" type="string[]" required>
+  Email address(es) for notifications
+</ParamField>
+
+<ParamField path="ContentFormat" type="string">
+  Email format: `standard` or `enhanced`
+</ParamField>
+
+<ParamField path="TriggerMatchless" type="boolean">
+  Send email when no matches are found
+</ParamField>
+
+**Example: Create email action for a rule**
+
+```powershell
+New-FalconReconAction -RuleId "rule-uuid" -Type email -Frequency asap -Recipient "security@example.com" -ContentFormat enhanced
+```
+
+### Modify an action
+
+```powershell Edit-FalconReconAction
+Edit-FalconReconAction -Id <string> -Frequency <string> -Recipient <string[]> -Status <string> -ContentFormat <string> -TriggerMatchless <boolean>
+```
+
+<ParamField path="Id" type="string" required>
+  Action identifier
+</ParamField>
+
+<ParamField path="Frequency" type="string" required>
+  Action frequency: `asap`, `daily`, or `weekly`
+</ParamField>
+
+<ParamField path="Recipient" type="string[]" required>
+  Email address(es)
+</ParamField>
+
+<ParamField path="Status" type="string" required>
+  Action status: `enabled` or `muted`
+</ParamField>
+
+<ParamField path="ContentFormat" type="string" required>
+  Email format: `standard` or `enhanced`
+</ParamField>
+
+<ParamField path="TriggerMatchless" type="boolean" required>
+  Send email when no matches are found
+</ParamField>
+
+### Delete an action
+
+```powershell
+Remove-FalconReconAction -Id <string>
+```
+
+<ParamField path="Id" type="string" required>
+  Action identifier
+</ParamField>
+
+## Export Jobs
+
+### Create an export job
+
+```powershell Invoke-FalconReconExport
+Invoke-FalconReconExport -Entity <string> -Filter <string> -Sort <string> -ExportType <string> -HumanReadable <boolean>
+```
+
+<ParamField path="Entity" type="string" required>
+  Entity type: `notification-exposed-data-record`
+</ParamField>
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language expression to filter export data
+</ParamField>
+
+<ParamField path="Sort" type="string" required>
+  Property and direction to sort results (see cmdlet help for full list)
+</ParamField>
+
+<ParamField path="ExportType" type="string" required>
+  Export file format: `csv` or `json`
+</ParamField>
+
+<ParamField path="HumanReadable" type="boolean" required>
+  Use property names that match the Falcon UI
+</ParamField>
+
+**Example: Export exposed credentials**
+
+```powershell
+$JobId = Invoke-FalconReconExport -Entity notification-exposed-data-record -Filter "email_domain:'example.com'" -Sort "created_date|desc" -ExportType csv -HumanReadable $true
+```
+
+### Check export job status
+
+```powershell Get-FalconReconExport
+Get-FalconReconExport -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Recon export job identifier(s)
+</ParamField>
+
+### Download export file
+
+```powershell Receive-FalconReconExport
+Receive-FalconReconExport -Path <string> -Id <string>
+```
+
+<ParamField path="Path" type="string" required>
+  Destination path for downloaded file
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Recon export job identifier
+</ParamField>
+
+**Example: Download completed export**
+
+```powershell
+Receive-FalconReconExport -Path ./exposed-data.csv -Id $JobId
+```
+
+### Delete export job
+
+```powershell
+Remove-FalconReconExport -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Recon export job identifier(s)
+</ParamField>
+
+## Common Workflows
+
+### Monitor for exposed credentials
+
+```powershell
+# Create monitoring rule
+$Rule = New-FalconReconRule -Name "Employee Email Monitoring" -Topic SA_EMAIL -Filter "email:*'@example.com'" -Priority high -Permission private -BreachMonitoring $true
+
+# Create email alert action
+New-FalconReconAction -RuleId $Rule.id -Type email -Frequency asap -Recipient "soc@example.com" -ContentFormat enhanced
+
+# Check for new notifications
+Get-FalconReconNotification -Filter "rule.id:'$($Rule.id)'+status:'new'" -Detailed -All
+```
+
+### Review and triage notifications
+
+```powershell
+# Get high-priority notifications
+$Notifications = Get-FalconReconNotification -Filter "rule.priority:'high'+status:'new'" -Detailed -All
+
+# Review and assign
+foreach ($Notification in $Notifications) {
+    Edit-FalconReconNotification -Id $Notification.id -Status in-progress -AssignedToUuid "analyst-uuid" -Message "Investigating"
+}
+```
+
+### Export and analyze breach data
+
+```powershell
+# Start export job
+$Job = Invoke-FalconReconExport -Entity notification-exposed-data-record -Filter "created_date:>'2024-01-01'" -Sort "created_date|desc" -ExportType csv -HumanReadable $true
+
+# Wait for completion
+do {
+    Start-Sleep -Seconds 5
+    $Status = Get-FalconReconExport -Id $Job.id
+} until ($Status.status -eq 'done')
+
+# Download results
+Receive-FalconReconExport -Path ./breach-data.csv -Id $Job.id
+
+# Clean up
+Remove-FalconReconExport -Id $Job.id
+```
+
+<Note>
+Requires **Monitoring rules (Falcon Intelligence Recon): Read** and **Write** permissions.
+</Note>

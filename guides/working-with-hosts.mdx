@@ -1,0 +1,289 @@
+---
+title: Working with Hosts
+description: Query, manage, and organize hosts in your Falcon environment
+---
+
+PSFalcon provides comprehensive cmdlets for discovering, managing, and organizing hosts across your CrowdStrike Falcon deployment.
+
+## Searching for Hosts
+
+### Basic Host Search
+
+Use `Get-FalconHost` to search for hosts with various filters:
+
+```powershell
+# Get all hosts
+Get-FalconHost -All
+
+# Search by hostname
+Get-FalconHost -Filter "hostname:'DESKTOP-*'" -Detailed
+
+# Find hosts by platform
+Get-FalconHost -Filter "platform_name:'Windows'" -All
+
+# Get hosts last seen in the last 24 hours
+Get-FalconHost -Filter "last_seen:>='now-1d'" -Detailed
+```
+
+### Retrieve Specific Host Details
+
+```powershell
+# Get host by device ID (AID)
+$HostId = 'a1b2c3d4e5f6789012345678901234ab'
+Get-FalconHost -Id $HostId
+
+# Get multiple hosts with detailed information
+$HostIds = @('a1b2c3d4...', 'b2c3d4e5...')
+Get-FalconHost -Id $HostIds -Detailed
+```
+
+<Note>
+Host identifiers use a 32-character hexadecimal format. They are also referred to as 'device_id' or 'aid' (Agent ID) throughout the API.
+</Note>
+
+## Host Information Enrichment
+
+### Include Additional Properties
+
+The `-Include` parameter adds extra information to host results:
+
+```powershell
+# Include group names
+Get-FalconHost -Filter "hostname:'WEB-*'" -Include group_names -Detailed
+
+# Include policy assignments
+Get-FalconHost -Id $HostId -Include policy_names
+
+# Include online state
+Get-FalconHost -Filter "platform_name:'Linux'" -Include online_state -Detailed
+
+# Include login history
+Get-FalconHost -Id $HostId -Include login_history
+
+# Include network address history
+Get-FalconHost -Id $HostId -Include network_history
+
+# Include Zero Trust Assessment
+Get-FalconHost -Id $HostId -Include zero_trust_assessment
+```
+
+<Steps>
+
+### Available Include Options
+
+<Step title="group_names">
+Retrieve the names of host groups the host belongs to
+</Step>
+
+<Step title="policy_names">
+Get the names of policies assigned to the host
+</Step>
+
+<Step title="online_state">
+Check if the host is currently online
+</Step>
+
+<Step title="login_history">
+View recent user login activity
+</Step>
+
+<Step title="network_history">
+See historical network addresses
+</Step>
+
+<Step title="zero_trust_assessment">
+Retrieve Zero Trust Assessment scores
+</Step>
+
+</Steps>
+
+## Managing Host Groups
+
+### Create Host Groups
+
+```powershell
+# Create a static host group
+New-FalconHostGroup -GroupType static -Name 'Production Servers' -Description 'All production workloads'
+
+# Create a dynamic host group with FQL rule
+New-FalconHostGroup -GroupType dynamic `
+  -Name 'Windows Servers' `
+  -AssignmentRule "platform_name:'Windows'+product_type_desc:'Server'"
+```
+
+### Search and Retrieve Groups
+
+```powershell
+# List all host groups
+Get-FalconHostGroup -All
+
+# Find specific group
+Get-FalconHostGroup -Filter "name:'Production*'" -Detailed
+
+# Get group members
+$Group = Get-FalconHostGroup -Filter "name:'Production Servers'"
+Get-FalconHostGroupMember -Id $Group.id -Detailed
+```
+
+### Modify Host Groups
+
+```powershell
+# Update group details
+Edit-FalconHostGroup -Id $GroupId -Name 'Production Systems' -Description 'Updated description'
+
+# Add hosts to a group
+$HostIds = @('a1b2c3d4...', 'b2c3d4e5...')
+Invoke-FalconHostGroupAction -Name add-hosts -Id $GroupId -HostId $HostIds
+
+# Remove hosts from a group
+Invoke-FalconHostGroupAction -Name remove-hosts -Id $GroupId -HostId $HostIds
+```
+
+## Host Actions
+
+### Containment Operations
+
+<CodeGroup>
+
+```powershell Network Containment
+# Contain a host (block network traffic)
+Invoke-FalconHostAction -Name contain -Id $HostId
+
+# Lift containment
+Invoke-FalconHostAction -Name lift_containment -Id $HostId
+```
+
+```powershell Hide/Unhide Hosts
+# Hide a host from the console
+Invoke-FalconHostAction -Name hide_host -Id $HostId
+
+# Unhide a host
+Invoke-FalconHostAction -Name unhide_host -Id $HostId
+```
+
+```powershell Detection Suppression
+# Suppress detections for a host
+Invoke-FalconHostAction -Name detection_suppress -Id $HostId
+
+# Unsuppress detections
+Invoke-FalconHostAction -Name detection_unsuppress -Id $HostId
+```
+
+</CodeGroup>
+
+### Bulk Actions with Additional Properties
+
+```powershell
+# Contain multiple hosts and return specific properties
+$HostIds = Get-FalconHost -Filter "hostname:'INFECTED-*'" | Select-Object -ExpandProperty device_id
+
+Invoke-FalconHostAction -Name contain -Id $HostIds `
+  -Include @('hostname', 'platform_name', 'last_seen', 'tags')
+```
+
+<Warning>
+Containment actions are **immediate and block network traffic**. Ensure you have alternative access (such as physical or out-of-band) before containing critical systems.
+</Warning>
+
+## Tagging Hosts
+
+### FalconGroupingTags
+
+Tags follow the format `FalconGroupingTags/<tag-name>`:
+
+```powershell
+# Add tags to hosts
+Add-FalconGroupingTag -Tag 'FalconGroupingTags/Production' -Id $HostId
+
+# Add multiple tags
+$Tags = @('FalconGroupingTags/WebServer', 'FalconGroupingTags/DMZ')
+Add-FalconGroupingTag -Tag $Tags -Id $HostIds
+
+# Remove tags
+Remove-FalconGroupingTag -Tag 'FalconGroupingTags/Production' -Id $HostId
+```
+
+<Note>
+Tag values can include letters, numbers, hyphens, underscores, and forward slashes. Use tags to organize hosts by application, environment, or business unit.
+</Note>
+
+## Advanced Workflows
+
+### Identify Stale Hosts
+
+```powershell
+# Find hosts not seen in 30 days
+$StaleHosts = Get-FalconHost -Filter "last_seen:<'now-30d'" -All
+
+Write-Host "Found $($StaleHosts.Count) stale hosts"
+$StaleHosts | Select-Object hostname, last_seen, platform_name | Format-Table
+```
+
+### Audit Host Group Membership
+
+```powershell
+# Get all groups and their members
+$Groups = Get-FalconHostGroup -All
+
+foreach ($Group in $Groups) {
+    $Members = Get-FalconHostGroupMember -Id $Group.id -Detailed -All
+    [PSCustomObject]@{
+        GroupName = $Group.name
+        GroupType = $Group.group_type
+        MemberCount = $Members.Count
+    }
+}
+```
+
+### Platform-Specific Queries
+
+```powershell
+# Get all Windows hosts with sensor version
+Get-FalconHost -Filter "platform_name:'Windows'" -Detailed -All |
+  Select-Object hostname, agent_version, os_version, last_seen
+
+# Find Linux servers in reduced functionality mode
+Get-FalconHost -Filter "platform_name:'Linux'+reduced_functionality_mode:'yes'" -Detailed
+
+# Get macOS hosts with specific OS version
+Get-FalconHost -Filter "platform_name:'Mac'+os_version:*'13.0'*" -All
+```
+
+## Sorting and Filtering
+
+### Sort Options
+
+```powershell
+# Sort by last seen (newest first)
+Get-FalconHost -Sort last_seen.desc -Limit 100
+
+# Sort by hostname
+Get-FalconHost -Sort hostname.asc -All
+
+# Sort by first seen date
+Get-FalconHost -Sort first_seen.asc -Limit 50
+```
+
+### Complex Filters
+
+```powershell
+# Multiple conditions with FQL
+Get-FalconHost -Filter "platform_name:'Windows'+status:'normal'+last_seen:>='now-7d'" -Detailed
+
+# Find hosts in specific groups
+Get-FalconHost -Filter "groups:['abc123def456']" -All
+
+# Query by external IP range
+Get-FalconHost -Filter "external_ip:['10.0.*']" -Detailed
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Real-Time Response" icon="terminal" href="./real-time-response">
+    Execute commands and collect data from live hosts
+  </Card>
+  <Card title="Managing Policies" icon="shield" href="./managing-policies">
+    Configure and assign prevention policies to host groups
+  </Card>
+</CardGroup>

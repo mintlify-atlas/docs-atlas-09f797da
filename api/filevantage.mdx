@@ -1,0 +1,401 @@
+---
+title: FileVantage File Integrity Monitoring
+description: Monitor and track file system changes with Falcon FileVantage
+---
+
+Falcon FileVantage provides real-time file integrity monitoring (FIM) for critical files and directories across Windows, Linux, and Mac systems. Track file changes, manage policies, rules, and respond to integrity violations.
+
+## Policy Management
+
+### Get-FalconFileVantagePolicy
+
+Search for FileVantage policies.
+
+```powershell
+Get-FalconFileVantagePolicy -Type Windows -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  FileVantage policy identifier(s)
+</ParamField>
+
+<ParamField path="Type" type="string" required>
+  Operating system type: `Linux`, `Mac`, `Windows`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Options: `created_timestamp|asc`, `created_timestamp|desc`, `modified_timestamp|asc`, `modified_timestamp|desc`, `precedence|asc`, `precedence|desc`
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties: `exclusions`
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### New-FalconFileVantagePolicy
+
+Create FileVantage policies.
+
+```powershell
+New-FalconFileVantagePolicy -Name "Windows Critical Files" -Platform Windows -Description "Monitor critical system files"
+```
+
+#### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name (1-100 characters)
+</ParamField>
+
+<ParamField path="Platform" type="string">
+  Operating system platform: `Linux`, `Mac`, `Windows`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description (0-500 characters)
+</ParamField>
+
+### Edit-FalconFileVantagePolicy
+
+Modify FileVantage policies.
+
+```powershell
+Edit-FalconFileVantagePolicy -Id <policy_id> -Enabled $true
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string" required>
+  FileVantage policy identifier
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Policy name (1-100 characters)
+</ParamField>
+
+<ParamField path="Enabled" type="boolean">
+  Policy enablement status
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description (0-500 characters)
+</ParamField>
+
+## Rule Group Management
+
+### Get-FalconFileVantageRuleGroup
+
+Search for FileVantage rule groups.
+
+```powershell
+Get-FalconFileVantageRuleGroup -Type WindowsFiles -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  FileVantage rule group identifier(s)
+</ParamField>
+
+<ParamField path="Type" type="string" required>
+  Rule group type: `LinuxFiles`, `MacFiles`, `WindowsFiles`, `WindowsRegistry`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+### New-FalconFileVantageRuleGroup
+
+Create FileVantage rule groups.
+
+```powershell
+New-FalconFileVantageRuleGroup -Type WindowsFiles -Name "System Configuration" -Description "Monitor system config files"
+```
+
+#### Parameters
+
+<ParamField path="Type" type="string" required>
+  Rule group type: `LinuxFiles`, `MacFiles`, `WindowsFiles`, `WindowsRegistry`
+</ParamField>
+
+<ParamField path="Name" type="string" required>
+  Rule group name (1-100 characters)
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Rule group description (0-500 characters)
+</ParamField>
+
+### Edit-FalconFileVantageRuleGroup
+
+Modify FileVantage rule groups.
+
+```powershell
+Edit-FalconFileVantageRuleGroup -Id <rulegroup_id> -Name "Updated Name"
+```
+
+## Rule Management
+
+### Get-FalconFileVantageRule
+
+List FileVantage rules within a rule group.
+
+```powershell
+Get-FalconFileVantageRule -RuleGroupId <rulegroup_id> -Id <rule_id>
+```
+
+#### Parameters
+
+<ParamField path="RuleGroupId" type="string" required>
+  FileVantage rule group identifier
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  FileVantage rule identifier(s)
+</ParamField>
+
+### New-FalconFileVantageRule
+
+Create a rule within a FileVantage rule group.
+
+```powershell
+New-FalconFileVantageRule -RuleGroupId <rulegroup_id> -Precedence 1 -Path "C:\Windows\System32\config" -Severity High -FileWrite $true -FileDelete $true
+```
+
+#### Parameters
+
+<ParamField path="RuleGroupId" type="string" required>
+  FileVantage rule group identifier
+</ParamField>
+
+<ParamField path="Precedence" type="int32" required>
+  Precedence for the new rule inside the rule group
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Path of the directory, file, or registry key to monitor (1-250 characters)
+</ParamField>
+
+<ParamField path="Depth" type="string">
+  Monitoring depth: `1`, `2`, `3`, `4`, `5`, `ANY`
+</ParamField>
+
+<ParamField path="Severity" type="string">
+  Rule severity: `Low`, `Medium`, `High`, `Critical`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Rule description (0-500 characters)
+</ParamField>
+
+<ParamField path="Include" type="string">
+  Files/directories to monitor (glob patterns, comma-separated)
+</ParamField>
+
+<ParamField path="Exclude" type="string">
+  Files/directories to exclude (glob patterns, comma-separated)
+</ParamField>
+
+<ParamField path="FileWrite" type="boolean">
+  Track file write events
+</ParamField>
+
+<ParamField path="FileDelete" type="boolean">
+  Track file delete events
+</ParamField>
+
+<ParamField path="FilePermission" type="boolean">
+  Track file permission change events
+</ParamField>
+
+<ParamField path="FileRename" type="boolean">
+  Track file rename events
+</ParamField>
+
+<ParamField path="DirectoryCreate" type="boolean">
+  Track directory create events
+</ParamField>
+
+<ParamField path="DirectoryDelete" type="boolean">
+  Track directory delete events
+</ParamField>
+
+<ParamField path="EnableContentCapture" type="boolean">
+  Enable the capture of file content during events
+</ParamField>
+
+<ParamField path="HashCapture" type="boolean">
+  Track file hash
+</ParamField>
+
+### Edit-FalconFileVantageRule
+
+Modify a rule within a FileVantage rule group.
+
+```powershell
+Edit-FalconFileVantageRule -Id <rule_id> -RuleGroupId <rulegroup_id> -Precedence 1 -Severity Critical
+```
+
+## Change Monitoring
+
+### Get-FalconFileVantageChange
+
+Search for Falcon FileVantage changes.
+
+```powershell
+Get-FalconFileVantageChange -Filter "action_timestamp:>'2024-01-01'" -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  FileVantage change identifier(s)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Options: `action_timestamp|asc`, `action_timestamp|desc`, `ingestion_timestamp|asc`, `ingestion_timestamp|desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+### Get-FalconFileVantageContent
+
+Retrieve content recorded in a Falcon FileVantage change.
+
+```powershell
+Get-FalconFileVantageContent -Id <change_id>
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string" required>
+  FileVantage change identifier
+</ParamField>
+
+### Invoke-FalconFileVantageAction
+
+Perform actions on Falcon FileVantage changes.
+
+```powershell
+Invoke-FalconFileVantageAction -Name suppress -Id <change_id> -Comment "False positive"
+```
+
+#### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform: `suppress`, `unsuppress`, `purge`
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="Id" type="string[]">
+  FileVantage change identifier(s)
+</ParamField>
+
+## Use Cases
+
+### Monitor Critical System Files
+
+```powershell
+# Create policy for Windows system files
+$Policy = New-FalconFileVantagePolicy -Name "Critical System Files" -Platform Windows
+
+# Create rule group
+$RuleGroup = New-FalconFileVantageRuleGroup -Type WindowsFiles -Name "System32 Monitoring"
+
+# Add rule to monitor System32
+$Rule = New-FalconFileVantageRule -RuleGroupId $RuleGroup.id -Precedence 1 `
+    -Path "C:\Windows\System32" -Depth 2 -Severity Critical `
+    -FileWrite $true -FileDelete $true -FilePermission $true
+
+# Assign rule group to policy
+Add-FalconFileVantageRuleGroup -PolicyId $Policy.id -Id $RuleGroup.id
+
+# Assign policy to host groups
+Add-FalconFileVantageHostGroup -PolicyId $Policy.id -Id <hostgroup_id>
+```
+
+### Review Recent File Changes
+
+```powershell
+# Get changes from the last 24 hours
+$Yesterday = (Get-Date).AddDays(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+$Changes = Get-FalconFileVantageChange -Filter "action_timestamp:>'$Yesterday'" -Detailed -All
+
+# Group by severity
+$Changes | Group-Object -Property severity | Select-Object Name, Count
+
+# Review high severity changes
+$Changes | Where-Object { $_.severity -eq 'High' } | Select-Object action_timestamp, path, change_type
+```
+
+### Investigate Suspicious Changes
+
+```powershell
+# Find changes to specific file
+$Changes = Get-FalconFileVantageChange -Filter "path:'*\\config\\*'" -Detailed
+
+# Get content for specific change
+$Content = Get-FalconFileVantageContent -Id $Changes[0].id
+
+# Suppress false positives
+Invoke-FalconFileVantageAction -Name suppress -Id $FalsePositiveIds -Comment "Approved maintenance"
+```
+
+<Note>
+Requires **Falcon FileVantage: Read** scope for read operations and **Falcon FileVantage: Write** scope for modifications. Content retrieval requires **Falcon FileVantage Content: Read** scope.
+</Note>
+
+## Related Resources
+
+- [FileVantage Documentation](https://falcon.crowdstrike.com/documentation/page/file-integrity-monitoring)
+- [File Integrity Monitoring Best Practices](https://www.crowdstrike.com/cybersecurity-101/observability/file-integrity-monitoring/)

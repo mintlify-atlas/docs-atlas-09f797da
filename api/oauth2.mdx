@@ -1,0 +1,505 @@
+---
+title: OAuth2 Authentication
+description: Request, manage, and revoke OAuth2 access tokens for CrowdStrike Falcon APIs
+---
+
+## Overview
+
+PSFalcon uses OAuth2 client credentials for authentication. These cmdlets manage the token lifecycle and credential caching for seamless API access.
+
+<Note>
+All API operations require a valid OAuth2 access token. Use `Request-FalconToken` before making any API calls.
+</Note>
+
+## Request-FalconToken
+
+Request an OAuth2 access token using your API credentials.
+
+<CodeGroup>
+```powershell Basic Authentication
+Request-FalconToken -ClientId <string> -ClientSecret <string>
+```
+
+```powershell Cloud Selection
+# US-1 (default)
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret -Cloud 'us-1'
+
+# US-2
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret -Cloud 'us-2'
+
+# EU-1
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret -Cloud 'eu-1'
+
+# US-GOV-1
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret -Cloud 'us-gov-1'
+```
+
+```powershell Multi-CID Authentication
+# Authenticate as child CID in Flight Control
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret -MemberCid $ChildCid
+```
+
+```powershell Interactive Prompt
+# Prompts for ClientId and ClientSecret if not provided
+Request-FalconToken
+```
+
+```powershell With Event Collector
+# Log token request to LogScale
+$Collector = @{
+    Uri = 'https://your-logscale-instance.com'
+    Token = 'your-ingest-token'
+    Enable = $true
+}
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret -Collector $Collector
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="ClientId" type="string">
+  OAuth2 client identifier (32-character hexadecimal)
+  
+  **Pattern:** `^[a-fA-F0-9]{32}$`
+  
+  **Aliases:** `client_id`
+  
+  If not provided, you will be prompted to enter it interactively.
+</ParamField>
+
+<ParamField path="ClientSecret" type="string">
+  OAuth2 client secret (40-character alphanumeric)
+  
+  **Pattern:** `^\w{40}$`
+  
+  **Aliases:** `client_secret`
+  
+  If not provided, you will be prompted to enter it interactively.
+</ParamField>
+
+<ParamField path="Cloud" type="string">
+  CrowdStrike cloud region
+  
+  **Valid values:**
+  - `us-1` - US Commercial 1 (default)
+  - `us-2` - US Commercial 2
+  - `eu-1` - EU Cloud
+  - `us-gov-1` - US GovCloud 1
+  - `us-gov-2` - US GovCloud 2
+  
+  This parameter simplifies hostname selection. Automatically converts to the appropriate `Hostname` value.
+</ParamField>
+
+<ParamField path="Hostname" type="string">
+  CrowdStrike API hostname (alternative to `Cloud` parameter)
+  
+  **Valid values:**
+  - `https://api.crowdstrike.com` (us-1)
+  - `https://api.us-2.crowdstrike.com` (us-2)
+  - `https://api.eu-1.crowdstrike.com` (eu-1)
+  - `https://api.laggar.gcw.crowdstrike.com` (us-gov-1)
+  - `https://api.us-gov-2.crowdstrike.mil` (us-gov-2)
+  
+  Use `Cloud` parameter for simpler syntax unless you need direct hostname control.
+</ParamField>
+
+<ParamField path="CustomUrl" type="string">
+  Custom API URL for module troubleshooting
+  
+  Used for testing or custom deployments. Overrides the `Hostname` parameter.
+</ParamField>
+
+<ParamField path="MemberCid" type="string">
+  Member CID for multi-CID authentication (Falcon Flight Control)
+  
+  **Pattern:** `^[a-fA-F0-9]{32}(-\w{2})?$`
+  
+  **Aliases:** `cid`, `member_cid`
+  
+  Used when authenticating from a parent CID to access a child CID's resources.
+</ParamField>
+
+<ParamField path="Collector" type="hashtable">
+  Event collector configuration for logging token requests
+  
+  **Required keys:**
+  - `Uri` - LogScale/Humio ingest endpoint
+  - `Token` - Ingest token
+  
+  **Optional keys:**
+  - `Enable` - Enable event collection (boolean)
+  
+  Integrates with `Register-FalconEventCollector` for audit logging.
+</ParamField>
+
+### Behavior
+
+**Credential Caching:**
+- Stores `ClientId`, `ClientSecret`, `Hostname`, and `MemberCid` for re-use
+- Caches the OAuth2 access token with expiration timestamp
+- Automatically requests a new token when current token expires in < 240 seconds
+
+**Cloud Redirection:**
+- Automatically follows redirects to the correct cloud region
+- Updates cached hostname if redirected (indicated by `X-Cs-Region` header)
+
+**TLS Configuration:**
+- Automatically sets TLS 1.2 for secure communication
+- Supports both `[System.Net.Http.HttpClientHandler]` and `[Net.ServicePointManager]`
+
+### Examples
+
+<CodeGroup>
+```powershell Example 1: First Authentication
+# Initial authentication with credentials
+Request-FalconToken -ClientId 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6' -ClientSecret 'Abc123Def456Ghi789Jkl012Mno345Pqr678Stu9'
+```
+
+```powershell Example 2: Re-authentication
+# Token automatically refreshed using cached credentials
+# No parameters needed after initial authentication
+Request-FalconToken
+```
+
+```powershell Example 3: Switch to Different CID
+# Switch to a child CID in Flight Control
+Request-FalconToken -MemberCid '12345678901234567890123456789012'
+```
+
+```powershell Example 4: Switch Clouds
+# Change from US-1 to EU-1 cloud
+Request-FalconToken -Cloud 'eu-1'
+```
+</CodeGroup>
+
+---
+
+## Revoke-FalconToken
+
+Revoke your active OAuth2 access token and clear cached credentials.
+
+<CodeGroup>
+```powershell Revoke Token
+Revoke-FalconToken
+```
+</CodeGroup>
+
+### Description
+
+Revokes the current OAuth2 access token at the CrowdStrike API and clears all cached credential information from the module, including:
+- OAuth2 access token
+- `ClientId`
+- `ClientSecret`
+- `MemberCid`
+
+After revocation, you must call `Request-FalconToken` again to authenticate.
+
+### Parameters
+
+This cmdlet has no parameters.
+
+### Examples
+
+<CodeGroup>
+```powershell Example 1: Clean Logout
+# Revoke token and clear credentials
+Revoke-FalconToken
+
+# Requires new authentication
+Request-FalconToken -ClientId $NewClientId -ClientSecret $NewClientSecret
+```
+
+```powershell Example 2: Switch API Credentials
+# Revoke current credentials
+Revoke-FalconToken
+
+# Authenticate with different credentials
+Request-FalconToken -ClientId $DifferentClientId -ClientSecret $DifferentClientSecret
+```
+</CodeGroup>
+
+---
+
+## Show-FalconToken
+
+Display your current OAuth2 access token value.
+
+<CodeGroup>
+```powershell Show Token
+Show-FalconToken
+```
+</CodeGroup>
+
+### Description
+
+Returns the current OAuth2 access token string (without the `Bearer` prefix). Useful for debugging or using the token outside PSFalcon.
+
+<Warning>
+Access tokens are sensitive credentials. Do not share or log them in unsecured locations.
+</Warning>
+
+### Parameters
+
+This cmdlet has no parameters.
+
+### Output
+
+Returns the access token as a string, or throws an error if no token is available.
+
+### Examples
+
+<CodeGroup>
+```powershell Example 1: Display Token
+# Show current token value
+Show-FalconToken
+# Output: eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzo...
+```
+
+```powershell Example 2: Use Token Externally
+# Get token for use with Invoke-RestMethod
+$Token = Show-FalconToken
+$Headers = @{ Authorization = "Bearer $Token" }
+Invoke-RestMethod -Uri 'https://api.crowdstrike.com/devices/queries/devices/v1' -Headers $Headers
+```
+
+```powershell Example 3: Check Token Before Operation
+# Verify token exists before proceeding
+try {
+    $Token = Show-FalconToken
+    Write-Host "Token available, proceeding with operations"
+} catch {
+    Write-Host "No token available, authenticating..."
+    Request-FalconToken
+}
+```
+</CodeGroup>
+
+---
+
+## Test-FalconToken
+
+Display OAuth2 access token status and cached credential information.
+
+<CodeGroup>
+```powershell Test Token
+Test-FalconToken
+```
+</CodeGroup>
+
+### Description
+
+Returns a `[PSCustomObject]` containing token status and cached credential information without exposing sensitive values.
+
+### Parameters
+
+This cmdlet has no parameters.
+
+### Output
+
+Returns an object with the following properties:
+
+<ResponseField name="Token" type="boolean">
+  `$true` if a valid token exists and expires in > 240 seconds, otherwise `$false`
+</ResponseField>
+
+<ResponseField name="Hostname" type="string">
+  Cached CrowdStrike API hostname
+</ResponseField>
+
+<ResponseField name="ClientId" type="string">
+  Cached OAuth2 client identifier
+</ResponseField>
+
+<ResponseField name="MemberCid" type="string">
+  Cached member CID (if applicable)
+</ResponseField>
+
+### Examples
+
+<CodeGroup>
+```powershell Example 1: Check Authentication Status
+# Check if authenticated
+$Status = Test-FalconToken
+if ($Status.Token) {
+    Write-Host "Authenticated to: $($Status.Hostname)"
+} else {
+    Write-Host "Not authenticated or token expired"
+    Request-FalconToken
+}
+```
+
+```powershell Example 2: Display Current Configuration
+# Show current connection details
+Test-FalconToken
+
+# Output:
+# Token     : True
+# Hostname  : https://api.crowdstrike.com
+# ClientId  : a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+# MemberCid :
+```
+
+```powershell Example 3: Conditional Logic
+# Only proceed if authenticated to correct cloud
+$Status = Test-FalconToken
+if ($Status.Token -and $Status.Hostname -eq 'https://api.eu-1.crowdstrike.com') {
+    Write-Host "Authenticated to EU cloud"
+    Get-FalconHost -Limit 1
+} else {
+    Write-Host "Not authenticated to EU cloud"
+}
+```
+
+```powershell Example 4: Multi-CID Verification
+# Verify MemberCid in Flight Control environment
+$Status = Test-FalconToken
+if ($Status.MemberCid) {
+    Write-Host "Operating in child CID: $($Status.MemberCid)"
+} else {
+    Write-Host "Operating in parent CID"
+}
+```
+</CodeGroup>
+
+---
+
+## Authentication Workflow
+
+<Steps>
+  <Step title="Request Token">
+    Authenticate with `Request-FalconToken` using your API credentials
+    
+    ```powershell
+    Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+    ```
+  </Step>
+  
+  <Step title="Automatic Token Refresh">
+    PSFalcon automatically refreshes your token when it expires in < 240 seconds
+    
+    No action required - happens transparently during API calls
+  </Step>
+  
+  <Step title="Check Status (Optional)">
+    Verify authentication status at any time
+    
+    ```powershell
+    Test-FalconToken
+    ```
+  </Step>
+  
+  <Step title="Revoke When Done">
+    Revoke token when finished (optional but recommended)
+    
+    ```powershell
+    Revoke-FalconToken
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Secure Credential Storage">
+    Never hardcode credentials in scripts. Use secure storage methods:
+    
+    ```powershell
+    # Store credentials securely
+    $ClientId = 'your-client-id'
+    $ClientSecret = Get-Content 'C:\secure\secret.txt' | ConvertTo-SecureString
+    $SecretPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($ClientSecret)
+    )
+    Request-FalconToken -ClientId $ClientId -ClientSecret $SecretPlain
+    ```
+    
+    Or use environment variables:
+    
+    ```powershell
+    Request-FalconToken -ClientId $env:FALCON_CLIENT_ID -ClientSecret $env:FALCON_CLIENT_SECRET
+    ```
+  </Accordion>
+  
+  <Accordion title="Token Lifecycle Management">
+    - Tokens are valid for 30 minutes by default
+    - PSFalcon auto-refreshes tokens expiring in < 4 minutes
+    - Revoke tokens when switching contexts or ending sessions
+    - Use `Test-FalconToken` to verify authentication state
+  </Accordion>
+  
+  <Accordion title="Multi-CID Environments">
+    In Falcon Flight Control (multi-CID) environments:
+    
+    ```powershell
+    # Authenticate to parent CID first
+    Request-FalconToken -ClientId $ParentClientId -ClientSecret $ParentClientSecret
+    
+    # Switch to child CID
+    Request-FalconToken -MemberCid $ChildCid
+    
+    # Perform operations in child context
+    Get-FalconHost -Limit 5
+    
+    # Switch back to parent or another child
+    Request-FalconToken  # Back to parent
+    Request-FalconToken -MemberCid $AnotherChildCid  # Different child
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling">
+    Always handle authentication errors gracefully:
+    
+    ```powershell
+    try {
+        Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+        Write-Host "Authentication successful"
+    } catch {
+        Write-Error "Authentication failed: $($_.Exception.Message)"
+        # Check credentials, cloud region, network connectivity
+        exit 1
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Invalid Client Credentials">
+    **Error:** `Cannot validate argument on parameter "ClientId"`
+    
+    **Solution:** Ensure ClientId is exactly 32 hexadecimal characters and ClientSecret is exactly 40 alphanumeric characters.
+  </Accordion>
+  
+  <Accordion title="Wrong Cloud/Region">
+    **Symptom:** HTTP 308 redirects or connection failures
+    
+    **Solution:** Verify you're using the correct `Cloud` parameter for your API credentials:
+    - US Commercial customers: `us-1` or `us-2`
+    - EU customers: `eu-1`
+    - GovCloud customers: `us-gov-1` or `us-gov-2`
+  </Accordion>
+  
+  <Accordion title="Token Expired">
+    **Error:** `No access token available`
+    
+    **Solution:** Run `Request-FalconToken` again. If credentials are cached, no parameters are needed.
+  </Accordion>
+  
+  <Accordion title="MemberCid Invalid">
+    **Error:** `Cannot validate argument on parameter "MemberCid"`
+    
+    **Solution:** Verify MemberCid format matches `^[a-fA-F0-9]{32}(-\w{2})?$`
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="CrowdStrike API Documentation" icon="book" href="https://falcon.crowdstrike.com/documentation">
+    Official API documentation and OAuth2 reference
+  </Card>
+  <Card title="PSFalcon Wiki" icon="github" href="https://github.com/crowdstrike/psfalcon/wiki">
+    Community examples and detailed guides
+  </Card>
+</CardGroup>

@@ -1,0 +1,786 @@
+---
+title: MSSP Operations
+description: Manage multiple customer CIDs using Falcon Flight Control
+icon: buildings
+---
+
+Automate operations across multiple customer CIDs in a Falcon Flight Control (MSSP) environment.
+
+## Understanding Flight Control
+
+Falcon Flight Control allows MSSPs to manage multiple customer environments (child CIDs) from a single parent CID. Use the `MemberCid` parameter to target specific child CIDs.
+
+### Authentication with Member CIDs
+
+```powershell
+# Authenticate to parent CID
+$Token = @{
+  ClientId = 'abc123...'
+  ClientSecret = 'def456...'
+  Cloud = 'us-1'
+}
+
+Request-FalconToken @Token
+
+# Get all active member CIDs
+$MemberCids = Get-FalconMemberCid -Detailed -All | Where-Object {
+  $_.status -eq 'active'
+} | Select-Object -ExpandProperty child_cid
+
+Write-Host "Found $($MemberCids.Count) active member CIDs"
+
+# Revoke parent token
+Revoke-FalconToken
+
+# Authenticate to specific member CID
+Request-FalconToken @Token -MemberCid $MemberCids[0]
+
+# Perform operations in child CID context
+$Hosts = Get-FalconHost -Detailed -All
+
+# Always revoke when done
+Revoke-FalconToken
+```
+
+<Note>
+  Always revoke tokens when switching between CIDs to avoid context confusion. Each `Request-FalconToken` call with a different `MemberCid` requires a separate authentication.
+</Note>
+
+## Multi-CID Host Operations
+
+### Query Hosts Across All Customer CIDs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter()]
+  [ValidateSet('eu-1', 'us-gov-1', 'us-1', 'us-2')]
+  [string]$Cloud = 'us-1',
+  
+  [Parameter()]
+  [string]$Filter
+)
+
+# Build token parameters
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+  Cloud = $Cloud
+}
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "multi_cid_hosts_$(Get-Date -Format FileDateTime).csv"
+
+# Get all member CIDs
+Request-FalconToken @Token
+$MemberCids = Get-FalconMemberCid -Detailed -All | Where-Object {
+  $_.status -eq 'active'
+}
+Revoke-FalconToken
+
+Write-Host "Processing $($MemberCids.Count) member CIDs"
+
+# Process each CID
+foreach ($Member in $MemberCids) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Member.child_cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      # Get hosts
+      $Param = @{
+        Detailed = $true
+        All = $true
+      }
+      
+      if ($Filter) {
+        $Param['Filter'] = $Filter
+      }
+      
+      $Hosts = Get-FalconHost @Param
+      
+      if ($Hosts) {
+        # Add CID information
+        @($Hosts).foreach{
+          $_ | Add-Member -NotePropertyName 'customer_cid' -NotePropertyValue $Member.child_cid -Force
+          $_ | Add-Member -NotePropertyName 'customer_name' -NotePropertyValue $Member.name -Force
+        }
+        
+        # Export to CSV
+        $Hosts | Select-Object customer_cid, customer_name, device_id, hostname, platform_name, 
+          os_version, agent_version, last_seen | 
+          Export-Csv -Path $OutputFile -NoTypeInformation -Append
+        
+        Write-Host "$($Member.name): Found $($Hosts.Count) hosts"
+      } else {
+        Write-Host "$($Member.name): No hosts found"
+      }
+    }
+  } catch {
+    Write-Error "Failed to process $($Member.name): $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 2  # Rate limiting
+    }
+  }
+}
+
+if (Test-Path $OutputFile) {
+  Write-Host "`nResults exported to:"
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+### Contain Hosts Across Multiple CIDs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter()]
+  [string[]]$MemberCid,
+  
+  [Parameter(Mandatory)]
+  [string]$Hostname
+)
+
+# Build token
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+}
+
+# Get member CIDs if not specified
+if (!$MemberCid) {
+  Request-FalconToken @Token
+  $MemberCid = Get-FalconMemberCid -Detailed -All | Where-Object {
+    $_.status -eq 'active'
+  } | Select-Object -ExpandProperty child_cid
+  Revoke-FalconToken
+}
+
+Write-Host "Searching for '$Hostname' in $($MemberCid.Count) member CIDs"
+
+$Results = @()
+
+foreach ($Cid in $MemberCid) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      # Find host
+      $Host = Get-FalconHost -Filter "hostname:['$Hostname']" -Sort last_seen.desc -Limit 1 -Detailed
+      
+      if ($Host) {
+        Write-Host "Found in CID $Cid - Containing..."
+        
+        # Contain host
+        $Action = $Host.device_id | Invoke-FalconHostAction -Name contain
+        
+        $Results += [PSCustomObject]@{
+          cid = $Cid
+          hostname = $Host.hostname
+          device_id = $Host.device_id
+          platform = $Host.platform_name
+          last_seen = $Host.last_seen
+          contained = if ($Action.id -eq $Host.device_id) { 'Success' } else { 'Failed' }
+        }
+      }
+    }
+  } catch {
+    Write-Error "Failed to process CID $Cid: $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+
+if ($Results) {
+  Write-Host "`nContainment Results:"
+  $Results | Format-Table -AutoSize
+} else {
+  Write-Host "Host '$Hostname' not found in any member CID"
+}
+```
+
+## Multi-CID Policy Management
+
+### Assign Host Groups to Policy Across CIDs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter()]
+  [ValidateSet('eu-1', 'us-gov-1', 'us-1', 'us-2')]
+  [string]$Cloud,
+  
+  [Parameter()]
+  [string[]]$MemberCid,
+  
+  [Parameter(Mandatory)]
+  [string[]]$GroupName,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('DeviceControl', 'Firewall', 'Prevention', 'Response', 'SensorUpdate')]
+  [string]$PolicyType,
+  
+  [Parameter(Mandatory)]
+  [string]$PolicyId
+)
+
+# Build token
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+}
+if ($Cloud) { $Token['Cloud'] = $Cloud }
+
+# Get member CIDs if not specified
+if (!$MemberCid) {
+  Request-FalconToken @Token
+  $MemberCid = Get-FalconMemberCid -Detailed -All | Where-Object {
+    $_.status -eq 'active'
+  } | Select-Object -ExpandProperty child_cid
+  Revoke-FalconToken
+}
+
+# Log file
+$OutputFile = Join-Path (Get-Location).Path "policy_assignment_$(Get-Date -Format FileDateTime).log"
+
+function Write-LogEntry {
+  param(
+    [string]$Source,
+    [string]$Message
+  )
+  
+  $Entry = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Source] $Message"
+  Write-Host $Entry
+  $Entry | Out-File -FilePath $OutputFile -Append
+}
+
+Write-LogEntry 'Start' "Processing $($MemberCid.Count) member CIDs"
+
+foreach ($Cid in $MemberCid) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      foreach ($Group in $GroupName) {
+        # Get host group ID
+        $GroupId = Get-FalconHostGroup -Filter "name:'$($Group.ToLower())'"
+        
+        if ($GroupId) {
+          # Assign to policy
+          $InvokeCommand = "Invoke-Falcon$($PolicyType)PolicyAction"
+          $Param = @{
+            Name = 'add-host-group'
+            Id = $PolicyId
+            GroupId = $GroupId
+          }
+          
+          $Assigned = & $InvokeCommand @Param
+          
+          $Message = if ($Assigned) {
+            "Assigned group $GroupId to $PolicyType policy '$($Assigned.id)' in CID '$Cid'"
+          } else {
+            "Failed to assign group $GroupId to $PolicyType policy '$PolicyId' in CID '$Cid'"
+          }
+          
+          Write-LogEntry $InvokeCommand $Message
+        } else {
+          Write-LogEntry 'Get-FalconHostGroup' "No results for group name '$Group' in CID '$Cid'"
+        }
+      }
+    }
+  } catch {
+    Write-LogEntry 'Error' "Failed to process CID $Cid: $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 5  # Rate limiting
+    }
+  }
+}
+
+Write-LogEntry 'End' 'Processing complete'
+
+if (Test-Path $OutputFile) {
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+### Audit Policy Assignments Across CIDs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter()]
+  [string[]]$MemberCid,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('DeviceControl', 'Firewall', 'Prevention', 'Response', 'SensorUpdate')]
+  [string]$PolicyType,
+  
+  [Parameter(Mandatory)]
+  [string[]]$PolicyId
+)
+
+# Build token
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+}
+
+# Get member CIDs if not specified
+if (!$MemberCid) {
+  Request-FalconToken @Token
+  $MemberCid = Get-FalconMemberCid -Detailed -All | Where-Object {
+    $_.status -eq 'active'
+  } | Select-Object -ExpandProperty child_cid
+  Revoke-FalconToken
+}
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "$($PolicyType)Assignment_$(Get-Date -Format FileDate).csv"
+
+foreach ($Cid in $MemberCid) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      # Get policy information
+      & "Get-Falcon$($PolicyType)Policy" -Id $PolicyId | Select-Object id, groups | ForEach-Object {
+        [PSCustomObject]@{
+          Cid = $Cid
+          PolicyId = $_.id
+          Groups = $_.groups.id -join ', '
+        } | Export-Csv -Path $OutputFile -NoTypeInformation -Append
+      }
+      
+      Write-Host "Exported policy assignments for CID '$Cid'"
+    }
+  } catch {
+    Write-Error "Failed to process CID $Cid: $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 5
+    }
+  }
+}
+
+if (Test-Path $OutputFile) {
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+## Multi-CID Detection Management
+
+### Query Detections Across All CIDs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter()]
+  [string]$Filter = "status:'new'+max_severity_displayname:'Critical'",
+  
+  [Parameter()]
+  [int]$DaysBack = 7
+)
+
+# Build token
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+}
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "multi_cid_detections_$(Get-Date -Format FileDateTime).csv"
+
+# Get member CIDs
+Request-FalconToken @Token
+$MemberCids = Get-FalconMemberCid -Detailed -All | Where-Object {
+  $_.status -eq 'active'
+}
+Revoke-FalconToken
+
+Write-Host "Querying detections in $($MemberCids.Count) member CIDs"
+
+# Add time filter
+$TimeFilter = "last_behavior:>'now-$($DaysBack)d'"
+$CombinedFilter = "$Filter+$TimeFilter"
+
+$TotalDetections = 0
+
+foreach ($Member in $MemberCids) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Member.child_cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      # Get detections
+      $Detections = Get-FalconDetection -Filter $CombinedFilter -Detailed -All
+      
+      if ($Detections) {
+        # Add CID info and export
+        @($Detections).foreach{
+          [PSCustomObject]@{
+            customer_cid = $Member.child_cid
+            customer_name = $Member.name
+            detection_id = $_.detection_id
+            hostname = $_.device.hostname
+            severity = $_.max_severity_displayname
+            status = $_.status
+            first_behavior = $_.first_behavior
+            last_behavior = $_.last_behavior
+            assigned_to = $_.assigned_to_name
+          } | Export-Csv -Path $OutputFile -NoTypeInformation -Append
+        }
+        
+        $TotalDetections += $Detections.Count
+        Write-Host "$($Member.name): Found $($Detections.Count) detections"
+      } else {
+        Write-Host "$($Member.name): No detections found"
+      }
+    }
+  } catch {
+    Write-Error "Failed to process $($Member.name): $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+
+Write-Host "`nTotal detections across all CIDs: $TotalDetections"
+
+if (Test-Path $OutputFile) {
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+## Multi-CID Host Group Verification
+
+### Verify Host Groups Exist in Child CIDs
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret,
+  
+  [Parameter(Mandatory)]
+  [string[]]$GroupName,
+  
+  [Parameter()]
+  [string[]]$MemberCid
+)
+
+# Build token
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+}
+
+# Get member CIDs if not specified
+if (!$MemberCid) {
+  Request-FalconToken @Token
+  $MemberCid = Get-FalconMemberCid -Detailed -All | Where-Object {
+    $_.status -eq 'active'
+  } | Select-Object -ExpandProperty child_cid
+  Revoke-FalconToken
+}
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "group_verification_$(Get-Date -Format FileDateTime).csv"
+
+foreach ($Cid in $MemberCid) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      foreach ($Group in $GroupName) {
+        # Check if group exists
+        $GroupId = Get-FalconHostGroup -Filter "name:'$($Group.ToLower())'"
+        
+        [PSCustomObject]@{
+          cid = $Cid
+          group_name = $Group
+          exists = if ($GroupId) { 'Yes' } else { 'No' }
+          group_id = if ($GroupId) { $GroupId } else { '' }
+        } | Export-Csv -Path $OutputFile -NoTypeInformation -Append
+      }
+      
+      Write-Host "Verified groups in CID '$Cid'"
+    }
+  } catch {
+    Write-Error "Failed to process CID $Cid: $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+
+if (Test-Path $OutputFile) {
+  # Display summary
+  $Results = Import-Csv -Path $OutputFile
+  $Missing = $Results | Where-Object { $_.exists -eq 'No' }
+  
+  Write-Host "`nSummary:"
+  Write-Host "  Total checks: $($Results.Count)"
+  Write-Host "  Groups found: $(($Results | Where-Object { $_.exists -eq 'Yes' }).Count)"
+  Write-Host "  Groups missing: $($Missing.Count)"
+  
+  if ($Missing) {
+    Write-Host "`nMissing groups:"
+    $Missing | Format-Table -AutoSize
+  }
+  
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+## MSSP Reporting Dashboard
+
+### Generate Multi-CID Summary Report
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$ClientId,
+  
+  [Parameter(Mandatory)]
+  [string]$ClientSecret
+)
+
+# Build token
+$Token = @{
+  ClientId = $ClientId
+  ClientSecret = $ClientSecret
+}
+
+# Get member CIDs
+Request-FalconToken @Token
+$MemberCids = Get-FalconMemberCid -Detailed -All | Where-Object {
+  $_.status -eq 'active'
+}
+Revoke-FalconToken
+
+Write-Host "Generating report for $($MemberCids.Count) member CIDs"
+
+$Report = @()
+
+foreach ($Member in $MemberCids) {
+  try {
+    # Authenticate to member CID
+    Request-FalconToken @Token -MemberCid $Member.child_cid
+    
+    if ((Test-FalconToken).Token -eq $true) {
+      # Gather metrics
+      $TotalHosts = Get-FalconHost -Total
+      $OnlineHosts = Get-FalconHost -Filter "last_seen:>'now-24h'" -Total
+      $NewDetections = Get-FalconDetection -Filter "status:'new'" -Total
+      $CriticalDetections = Get-FalconDetection -Filter "max_severity_displayname:'Critical'" -Total
+      $ContainedHosts = Get-FalconHost -Filter "status:'containment_pending','contained'" -Total
+      
+      $Report += [PSCustomObject]@{
+        customer_name = $Member.name
+        customer_cid = $Member.child_cid
+        total_hosts = $TotalHosts
+        online_hosts = $OnlineHosts
+        offline_hosts = $TotalHosts - $OnlineHosts
+        new_detections = $NewDetections
+        critical_detections = $CriticalDetections
+        contained_hosts = $ContainedHosts
+        health_score = [Math]::Round(($OnlineHosts / [Math]::Max($TotalHosts, 1)) * 100, 2)
+      }
+      
+      Write-Host "$($Member.name): Collected metrics"
+    }
+  } catch {
+    Write-Error "Failed to process $($Member.name): $_"
+  } finally {
+    if ((Test-FalconToken).Token -eq $true) {
+      Revoke-FalconToken
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+
+# Display and export report
+Write-Host "`nMSSP Summary Report - $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+Write-Host ("=" * 80)
+
+$Report | Format-Table -AutoSize
+
+# Export to CSV
+$OutputFile = Join-Path (Get-Location).Path "mssp_summary_$(Get-Date -Format FileDateTime).csv"
+$Report | Export-Csv -Path $OutputFile -NoTypeInformation
+
+Write-Host "`nReport exported to:"
+Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+
+# Summary statistics
+$TotalStats = [PSCustomObject]@{
+  total_customers = $Report.Count
+  total_hosts = ($Report.total_hosts | Measure-Object -Sum).Sum
+  total_online = ($Report.online_hosts | Measure-Object -Sum).Sum
+  total_new_detections = ($Report.new_detections | Measure-Object -Sum).Sum
+  total_critical_detections = ($Report.critical_detections | Measure-Object -Sum).Sum
+  avg_health_score = [Math]::Round(($Report.health_score | Measure-Object -Average).Average, 2)
+}
+
+Write-Host "`nOverall Statistics:"
+$TotalStats | Format-List
+```
+
+<Warning>
+  Always use `Revoke-FalconToken` when switching between CIDs. Failure to revoke can result in operations being performed in the wrong customer environment.
+</Warning>
+
+## Best Practices for MSSP Operations
+
+### Error Handling and Logging
+
+```powershell
+function Invoke-MultiCidOperation {
+  param(
+    [hashtable]$Token,
+    [string[]]$MemberCid,
+    [scriptblock]$Operation
+  )
+  
+  $Results = @()
+  $ErrorLog = @()
+  
+  foreach ($Cid in $MemberCid) {
+    $OperationSuccess = $false
+    
+    try {
+      Request-FalconToken @Token -MemberCid $Cid
+      
+      if ((Test-FalconToken).Token -eq $true) {
+        # Execute operation
+        $Result = & $Operation
+        
+        $Results += [PSCustomObject]@{
+          cid = $Cid
+          success = $true
+          result = $Result
+          error = $null
+        }
+        
+        $OperationSuccess = $true
+      }
+    } catch {
+      $ErrorLog += [PSCustomObject]@{
+        cid = $Cid
+        timestamp = Get-Date
+        error = $_.Exception.Message
+        stack_trace = $_.ScriptStackTrace
+      }
+      
+      $Results += [PSCustomObject]@{
+        cid = $Cid
+        success = $false
+        result = $null
+        error = $_.Exception.Message
+      }
+    } finally {
+      if ((Test-FalconToken).Token -eq $true) {
+        Revoke-FalconToken
+      }
+      
+      # Rate limiting
+      Start-Sleep -Seconds 2
+    }
+  }
+  
+  return @{
+    Results = $Results
+    ErrorLog = $ErrorLog
+  }
+}
+
+# Usage example
+$Operation = {
+  Get-FalconHost -Filter "last_seen:>'now-24h'" -Total
+}
+
+$Output = Invoke-MultiCidOperation -Token $Token -MemberCid $MemberCids -Operation $Operation
+
+Write-Host "Successful operations: $(($Output.Results | Where-Object { $_.success }).Count)"
+Write-Host "Failed operations: $(($Output.Results | Where-Object { -not $_.success }).Count)"
+```
+
+<Note>
+  Implement rate limiting (2-5 seconds between CID operations) to avoid API throttling. Use try/finally blocks to ensure tokens are always revoked.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bulk Operations" icon="layer-group" href="/examples/bulk-operations">
+    Process thousands of resources
+  </Card>
+  <Card title="Reporting Automation" icon="chart-line" href="/examples/reporting-automation">
+    Generate automated reports
+  </Card>
+</CardGroup>

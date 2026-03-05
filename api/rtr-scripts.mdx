@@ -1,0 +1,638 @@
+---
+title: 'RTR Scripts'
+description: 'Manage and execute custom PowerShell and Bash scripts via Real-time Response'
+icon: 'file-code'
+---
+
+## Overview
+
+RTR Scripts enable you to upload, manage, and execute custom PowerShell, Bash, and Zsh scripts on endpoints through Real-time Response. Scripts provide repeatable, auditable automation for investigation and remediation tasks.
+
+<Note>
+Custom scripts require admin-level RTR permissions and are subject to permission controls (private, group, or public).
+</Note>
+
+## Script Management
+
+### Get-FalconScript
+
+Search for custom Real-time Response scripts.
+
+<ParamField path="Id" type="string[]">
+  Script identifier(s) to retrieve. Format: `{32-char-hex}_{32-char-hex}`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to filter results.
+  
+  Available filter fields:
+  - `name` - Script name
+  - `platform` - Target platform (windows, mac, linux)
+  - `description` - Script description
+  - `created_by` - Creator email
+  - `modified_timestamp` - Last modification time
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+</ParamField>
+
+<ParamField path="Limit" type="int32" default="100">
+  Maximum number of results per request. Valid range: 1-100.
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results for pagination.
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information including script metadata.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: List All Scripts
+# Get all custom scripts with details
+$Scripts = Get-FalconScript -Detailed -All
+
+foreach ($Script in $Scripts) {
+  Write-Host "$($Script.name) [$($Script.platform -join ', ')] - $($Script.description)"
+}
+```
+
+```powershell Example: Search Scripts
+# Find Windows scripts modified recently
+$RecentScripts = Get-FalconScript `
+  -Filter "platform:'windows'+modified_timestamp:>'2024-01-01'" `
+  -Detailed
+```
+
+### Send-FalconScript
+
+Upload a custom Real-time Response script.
+
+<ParamField path="Path" type="string" required>
+  Path to local script file or string-based script content.
+  
+  Supported file types:
+  - PowerShell: `.ps1`
+  - Bash/Zsh: `.sh`
+</ParamField>
+
+<ParamField path="Platform" type="string[]" required>
+  Operating system platform(s) where script can execute.
+  
+  Valid values: `windows`, `mac`, `linux`
+  
+  You can specify multiple platforms if the script is compatible.
+</ParamField>
+
+<ParamField path="PermissionType" type="string" required>
+  Permission level controlling who can execute the script.
+  
+  - `private` - Only the creator can execute
+  - `group` - All users with 'Administrators' role can execute  
+  - `public` - Both 'Administrators' and 'Active Responders' can execute
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Script name for identification. Max length: 32766 characters.
+  
+  Defaults to filename if not specified.
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Description of script purpose and functionality.
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment explaining the upload. Max length: 4096 characters.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Upload Investigation Script
+# Upload PowerShell script for Windows hosts
+$Script = Send-FalconScript -Path './scripts/check-scheduled-tasks.ps1' `
+  -Platform 'windows' `
+  -PermissionType 'public' `
+  -Name 'CheckScheduledTasks' `
+  -Description 'Lists all scheduled tasks for investigation' `
+  -Comment 'Uploaded for threat hunting operations'
+
+Write-Host "Script ID: $($Script.id)"
+```
+
+```powershell Example: Cross-Platform Script
+# Upload script compatible with multiple platforms
+$UnixScript = Send-FalconScript -Path './scripts/check-persistence.sh' `
+  -Platform @('mac', 'linux') `
+  -PermissionType 'group' `
+  -Name 'CheckPersistence' `
+  -Description 'Checks common persistence locations'
+```
+
+### Edit-FalconScript
+
+Modify an existing Real-time Response script.
+
+<ParamField path="Id" type="string" required>
+  Script identifier to modify. Format: `{32-char-hex}_{32-char-hex}`
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Path to updated script file.
+</ParamField>
+
+<ParamField path="Platform" type="string[]">
+  Updated platform(s). Valid values: `windows`, `mac`, `linux`
+</ParamField>
+
+<ParamField path="PermissionType" type="string">
+  Updated permission level: `private`, `group`, or `public`
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Updated script name.
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Updated description.
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment for this modification. Max length: 4096 characters.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Update Script
+# Update script content and description
+$Updated = Edit-FalconScript -Id $Script.id `
+  -Path './scripts/check-scheduled-tasks-v2.ps1' `
+  -Description 'Enhanced scheduled task investigation with filtering' `
+  -Comment 'Added filtering for suspicious tasks'
+```
+
+### Remove-FalconScript
+
+Delete a custom Real-time Response script.
+
+<ParamField path="Id" type="string" required>
+  Script identifier to remove.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Delete Script
+# Remove outdated script
+Remove-FalconScript -Id $Script.id
+```
+
+## FalconScript Library
+
+CrowdStrike provides pre-built scripts in the FalconScript library for common investigation and response tasks.
+
+### Get-FalconLibraryScript
+
+Search for scripts in the official FalconScript library.
+
+<ParamField path="Id" type="string[]">
+  Library script identifier(s) to retrieve.
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to filter results.
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+  
+  Valid values:
+  - `modified_timestamp.asc` / `modified_timestamp.desc`
+  - `name.asc` / `name.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32" default="100">
+  Maximum number of results per request. Valid range: 1-500.
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Retrieve all available results.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Browse Library Scripts
+# List all available FalconScript library scripts
+$LibraryScripts = Get-FalconLibraryScript -Detailed -All
+
+foreach ($Script in $LibraryScripts) {
+  Write-Host "$($Script.name)"
+  Write-Host "  Platform: $($Script.platform -join ', ')"
+  Write-Host "  Description: $($Script.description)"
+  Write-Host ""
+}
+```
+
+## Script Execution
+
+### Execute Custom Scripts with runscript
+
+Use the `runscript` admin command to execute uploaded custom scripts.
+
+```powershell Example: Execute Custom Script
+# Start RTR session
+$Session = Start-FalconSession -Id $HostId
+
+# Execute custom script
+$Result = Invoke-FalconAdminCommand -Command runscript `
+  -Argument '-CloudFile=CheckScheduledTasks' `
+  -SessionId $Session.session_id -Wait
+
+# Review output
+if ($Result.complete) {
+  Write-Host "Script Output:"
+  Write-Host $Result.stdout
+  
+  if ($Result.stderr) {
+    Write-Warning "Errors: $($Result.stderr)"
+  }
+} else {
+  Write-Warning "Script execution did not complete"
+}
+
+# Clean up
+Remove-FalconSession -Id $Session.session_id
+```
+
+### Execute FalconScript Library Scripts
+
+Use the `falconscript` admin command for library scripts.
+
+```powershell Example: Execute Library Script
+# Execute a FalconScript from the library
+$FalconScriptResult = Invoke-FalconAdminCommand -Command falconscript `
+  -Argument '-Name=get_process_tree' `
+  -SessionId $Session.session_id -Wait
+
+Write-Host $FalconScriptResult.stdout
+```
+
+### Script Arguments
+
+Pass parameters to scripts using the `-Raw` argument format.
+
+```powershell Example: Script with Parameters
+# Execute script with parameters
+$ScriptWithArgs = Invoke-FalconAdminCommand -Command runscript `
+  -Argument '-CloudFile=CheckScheduledTasks -Raw=```{"TaskPath":"\\Microsoft\\Windows\\"}```' `
+  -SessionId $Session.session_id -Wait
+```
+
+## Advanced Script Workflows
+
+<Steps>
+  <Step title="Develop and Test Script Locally">
+    Create and test your script before uploading.
+    
+    ```powershell check-registry-persistence.ps1
+    # Check for common registry persistence locations
+    param(
+      [string]$Hive = 'HKLM'
+    )
+    
+    $PersistenceKeys = @(
+      'Software\\Microsoft\\Windows\\CurrentVersion\\Run',
+      'Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce',
+      'Software\\Microsoft\\Windows\\CurrentVersion\\RunServices',
+      'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders'
+    )
+    
+    foreach ($Key in $PersistenceKeys) {
+      $FullPath = "${Hive}:\\${Key}"
+      if (Test-Path $FullPath) {
+        Write-Host "Checking: $FullPath"
+        Get-ItemProperty -Path $FullPath | Format-List
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Upload Script">
+    Upload to CrowdStrike with appropriate permissions.
+    
+    ```powershell
+    $Script = Send-FalconScript `
+      -Path './check-registry-persistence.ps1' `
+      -Platform 'windows' `
+      -PermissionType 'public' `
+      -Name 'CheckRegistryPersistence' `
+      -Description 'Scans common registry persistence locations' `
+      -Comment 'v1.0 - Initial upload for threat hunting'
+    ```
+  </Step>
+  
+  <Step title="Execute Across Fleet">
+    Run the script on multiple hosts.
+    
+    ```powershell
+    # Target hosts for investigation
+    $TargetHosts = Get-FalconHost -Filter "platform_name:'Windows'" |
+      Select-Object -ExpandProperty device_id -First 10
+    
+    # Start batch session
+    $Batch = Start-FalconSession -Id $TargetHosts
+    
+    # Execute script on all hosts
+    $Results = Invoke-FalconAdminCommand -Command runscript `
+      -Argument '-CloudFile=CheckRegistryPersistence' `
+      -BatchId $Batch.batch_id
+    
+    # Process results
+    foreach ($HostResult in $Results) {
+      Write-Host "Host: $($HostResult.aid)"
+      if ($HostResult.complete) {
+        Write-Host $HostResult.stdout
+      } else {
+        Write-Warning "Failed: $($HostResult.errors.message)"
+      }
+      Write-Host "---"
+    }
+    
+    # Clean up
+    Remove-FalconSession -Id $Batch.batch_id
+    ```
+  </Step>
+  
+  <Step title="Update Based on Findings">
+    Improve the script and update it.
+    
+    ```powershell
+    # Upload improved version
+    Edit-FalconScript -Id $Script.id `
+      -Path './check-registry-persistence-v2.ps1' `
+      -Description 'Enhanced with additional persistence locations' `
+      -Comment 'v2.0 - Added service persistence checks'
+    ```
+  </Step>
+</Steps>
+
+## Real-World Script Examples
+
+### Investigation: Network Connections
+
+```powershell network-investigation.ps1
+# Investigate active network connections
+param(
+  [int]$Port,
+  [string]$RemoteIP
+)
+
+$Connections = Get-NetTCPConnection | Where-Object {
+  $_.State -eq 'Established'
+}
+
+if ($Port) {
+  $Connections = $Connections | Where-Object { $_.RemotePort -eq $Port }
+}
+
+if ($RemoteIP) {
+  $Connections = $Connections | Where-Object { $_.RemoteAddress -eq $RemoteIP }
+}
+
+foreach ($Conn in $Connections) {
+  $Process = Get-Process -Id $Conn.OwningProcess -ErrorAction SilentlyContinue
+  [PSCustomObject]@{
+    LocalAddress  = $Conn.LocalAddress
+    LocalPort     = $Conn.LocalPort
+    RemoteAddress = $Conn.RemoteAddress
+    RemotePort    = $Conn.RemotePort
+    State         = $Conn.State
+    ProcessName   = $Process.Name
+    ProcessId     = $Conn.OwningProcess
+    ProcessPath   = $Process.Path
+  }
+}
+```
+
+### Remediation: Remove Persistence
+
+```powershell remove-malware-persistence.ps1
+# Remove malware persistence mechanisms
+param(
+  [string]$MalwareName
+)
+
+$Removed = @()
+
+# Check Run keys
+$RunKeys = @(
+  'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',
+  'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
+)
+
+foreach ($Key in $RunKeys) {
+  $Values = Get-ItemProperty -Path $Key -ErrorAction SilentlyContinue
+  foreach ($Property in $Values.PSObject.Properties) {
+    if ($Property.Value -like "*$MalwareName*") {
+      Remove-ItemProperty -Path $Key -Name $Property.Name -Force
+      $Removed += "$Key\\$($Property.Name)"
+    }
+  }
+}
+
+# Check scheduled tasks
+$Tasks = Get-ScheduledTask | Where-Object {
+  $_.Actions.Execute -like "*$MalwareName*"
+}
+
+foreach ($Task in $Tasks) {
+  Unregister-ScheduledTask -TaskName $Task.TaskName -Confirm:$false
+  $Removed += "Task: $($Task.TaskName)"
+}
+
+if ($Removed.Count -gt 0) {
+  Write-Host "Removed persistence:"
+  $Removed | ForEach-Object { Write-Host "  - $_" }
+} else {
+  Write-Host "No persistence found for: $MalwareName"
+}
+```
+
+### Collection: Memory Analysis
+
+```bash memory-analysis.sh
+#!/bin/bash
+# Collect memory artifacts from suspicious process
+
+PROCESS_NAME=$1
+
+if [ -z "$PROCESS_NAME" ]; then
+  echo "Usage: $0 <process_name>"
+  exit 1
+fi
+
+# Find process PID
+PID=$(pgrep -f "$PROCESS_NAME" | head -1)
+
+if [ -z "$PID" ]; then
+  echo "Process not found: $PROCESS_NAME"
+  exit 1
+fi
+
+echo "Analyzing process: $PROCESS_NAME (PID: $PID)"
+echo ""
+
+# Display process info
+echo "Process Info:"
+ps -p $PID -o pid,ppid,user,%cpu,%mem,comm,args
+echo ""
+
+# Display memory maps
+echo "Memory Maps:"
+cat /proc/$PID/maps | head -20
+echo ""
+
+# Display open files
+echo "Open Files:"
+lsof -p $PID 2>/dev/null | head -20
+echo ""
+
+# Display network connections
+echo "Network Connections:"
+lsof -i -a -p $PID 2>/dev/null
+```
+
+## Script Management Best Practices
+
+<Warning>
+**Security Considerations**
+- Review all scripts before upload to prevent malicious code
+- Use `private` or `group` permissions for sensitive scripts
+- Include audit comments for all uploads and modifications
+- Test scripts in non-production environments first
+- Maintain version control for script changes
+</Warning>
+
+<Note>
+**Organization**
+- Use descriptive names that indicate script purpose
+- Provide detailed descriptions including expected output
+- Document required parameters in the description
+- Tag scripts with version numbers in comments
+- Remove obsolete scripts to reduce clutter
+</Note>
+
+## Batch Script Execution Pattern
+
+```powershell Reusable Batch Script Execution
+function Invoke-FalconScriptBatch {
+  param(
+    [string[]]$HostIds,
+    [string]$ScriptName,
+    [string]$Arguments = '',
+    [int]$Timeout = 120
+  )
+  
+  # Start batch session
+  $Batch = Start-FalconSession -Id $HostIds -QueueOffline $true
+  
+  if (-not $Batch.batch_id) {
+    throw "Failed to create batch session"
+  }
+  
+  try {
+    # Build command argument
+    $CmdArg = if ($Arguments) {
+      "-CloudFile=$ScriptName -Raw=```$Arguments```"
+    } else {
+      "-CloudFile=$ScriptName"
+    }
+    
+    # Execute script
+    $Results = Invoke-FalconAdminCommand -Command runscript `
+      -Argument $CmdArg `
+      -BatchId $Batch.batch_id `
+      -Timeout $Timeout
+    
+    # Process and return results
+    $Results | ForEach-Object {
+      [PSCustomObject]@{
+        HostId   = $_.aid
+        Complete = $_.complete
+        Stdout   = $_.stdout
+        Stderr   = $_.stderr
+        Errors   = $_.errors
+      }
+    }
+  } finally {
+    # Always clean up session
+    Remove-FalconSession -Id $Batch.batch_id -ErrorAction SilentlyContinue
+  }
+}
+
+# Usage
+$Results = Invoke-FalconScriptBatch `
+  -HostIds $TargetHosts `
+  -ScriptName 'CheckRegistryPersistence' `
+  -Timeout 180
+
+# Analyze results
+$SuccessfulHosts = $Results | Where-Object { $_.Complete -eq $true }
+$FailedHosts = $Results | Where-Object { $_.Complete -ne $true }
+
+Write-Host "Successful: $($SuccessfulHosts.Count)"
+Write-Host "Failed: $($FailedHosts.Count)"
+```
+
+## Troubleshooting
+
+### Script Execution Failures
+
+```powershell Debug Script Execution
+# Execute with detailed error checking
+$Result = Invoke-FalconAdminCommand -Command runscript `
+  -Argument '-CloudFile=MyScript' `
+  -SessionId $Session.session_id -Wait
+
+# Check all possible error conditions
+if (-not $Result.complete) {
+  Write-Error "Script did not complete"
+  Write-Host "Cloud Request ID: $($Result.cloud_request_id)"
+}
+
+if ($Result.errors) {
+  Write-Error "Script errors: $($Result.errors | ConvertTo-Json)"
+}
+
+if ($Result.stderr) {
+  Write-Warning "Script stderr: $($Result.stderr)"
+}
+
+if ($Result.stdout) {
+  Write-Host "Script output:"
+  Write-Host $Result.stdout
+}
+```
+
+### Common Issues
+
+- **Script not found**: Verify script name matches exactly (case-sensitive)
+- **Permission denied**: Check script PermissionType and your role
+- **Timeout**: Increase timeout for long-running scripts
+- **Platform mismatch**: Ensure script platform matches host OS
+- **Syntax errors**: Validate script syntax before upload
+
+## Related APIs
+
+- [Real-time Response](/api/real-time-response) - Session management and read-only commands
+- [RTR Admin](/api/rtr-admin) - Administrative commands for script execution

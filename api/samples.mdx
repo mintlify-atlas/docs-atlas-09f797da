@@ -1,0 +1,296 @@
+---
+title: "Sample Files"
+description: "Upload, download, and manage sample files for analysis in CrowdStrike Falcon"
+---
+
+## Overview
+
+The Sample Files API allows you to upload suspicious files to CrowdStrike for analysis, download previously submitted samples, and manage sample file metadata. Samples can be submitted for analysis using Falcon Sandbox or Falcon QuickScan.
+
+<Note>
+  All sample operations require **Sample uploads: Read** or **Sample uploads: Write** permissions.
+</Note>
+
+## Get-FalconSample
+
+Retrieve detailed information about accessible sample files using SHA256 hash values.
+
+### Syntax
+
+```powershell
+Get-FalconSample [-Id] <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  SHA256 hash value(s) of the sample file(s). Must be 64-character hexadecimal strings.
+  
+  **Aliases:** `sha256s`, `sha256`, `ids`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Retrieve single sample
+Get-FalconSample -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+```
+
+```powershell Multiple samples
+$hashes = @(
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2'
+)
+Get-FalconSample -Id $hashes
+```
+
+```powershell Pipeline input
+'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' | Get-FalconSample
+```
+
+</CodeGroup>
+
+### Returns
+
+Detailed information about the sample file including SHA256 hash, file size, file type, and analysis status.
+
+---
+
+## Send-FalconSample
+
+Upload a sample file to CrowdStrike for analysis. Maximum file size is 256MB.
+
+### Syntax
+
+```powershell
+Send-FalconSample [-Path] <string> [[-IsConfidential] <boolean>] [[-Comment] <string>] [[-Name] <string>]
+```
+
+### Parameters
+
+<ParamField path="Path" type="string" required>
+  Path to the local file to upload. The file must exist and cannot be a directory.
+  
+  **Aliases:** `body`, `FullName`
+</ParamField>
+
+<ParamField path="IsConfidential" type="boolean" default="true">
+  Prohibit the sample from being displayed in MalQuery. Default is `True` to keep samples confidential.
+  
+  **Aliases:** `is_confidential`
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment describing the reason for the upload or additional context.
+</ParamField>
+
+<ParamField path="Name" type="string">
+  File name to use for the sample. If not specified, the local file name is used.
+  
+  **Aliases:** `file_name`, `FileName`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Upload sample file
+Send-FalconSample -Path 'C:\Samples\suspicious.exe'
+```
+
+```powershell With custom name and comment
+Send-FalconSample -Path 'C:\Samples\malware.bin' -Name 'suspected_ransomware.bin' -Comment 'Sample from incident INV-2024-001'
+```
+
+```powershell Allow MalQuery visibility
+Send-FalconSample -Path 'C:\Samples\sample.dll' -IsConfidential $false
+```
+
+```powershell Pipeline upload
+Get-ChildItem 'C:\Samples\*.exe' | ForEach-Object {
+  Send-FalconSample -Path $_.FullName -Comment "Batch upload from quarantine"
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  ZIP and 7z archives are automatically redirected to `Send-FalconSampleArchive` for special handling.
+</Tip>
+
+### Returns
+
+Upload confirmation with SHA256 hash that can be used for Falcon Sandbox or QuickScan submissions.
+
+---
+
+## Receive-FalconSample
+
+Download a previously submitted sample file from CrowdStrike.
+
+### Syntax
+
+```powershell
+Receive-FalconSample [-Path] <string> [-Id] <string> [[-PasswordProtected] <boolean>] [-Force]
+```
+
+### Parameters
+
+<ParamField path="Path" type="string" required>
+  Destination path where the sample file will be saved.
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  SHA256 hash value of the sample to download. Must be 64-character hexadecimal string.
+  
+  **Aliases:** `ids`
+</ParamField>
+
+<ParamField path="PasswordProtected" type="boolean">
+  Archive and password protect the sample with password `infected`.
+  
+  **Aliases:** `password_protected`
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present at the destination path.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Download sample
+Receive-FalconSample -Path 'C:\Downloads\sample.bin' -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+```
+
+```powershell Password-protected download
+Receive-FalconSample -Path 'C:\Downloads\sample.zip' -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -PasswordProtected $true
+```
+
+```powershell Force overwrite
+Receive-FalconSample -Path 'C:\Downloads\sample.exe' -Id 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2' -Force
+```
+
+```powershell Pipeline download
+Get-FalconSample -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' | Receive-FalconSample -Path 'C:\Downloads\sample.bin'
+```
+
+</CodeGroup>
+
+<Warning>
+  **Use password protection when downloading samples.** The password `infected` is a standard password for malware archives. Always handle downloaded samples in a secure, isolated environment.
+</Warning>
+
+---
+
+## Remove-FalconSample
+
+Remove a sample from your CrowdStrike environment.
+
+### Syntax
+
+```powershell
+Remove-FalconSample [-Id] <string>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  SHA256 hash value of the sample to remove. Must be 64-character hexadecimal string.
+  
+  **Aliases:** `ids`, `sha256`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Remove single sample
+Remove-FalconSample -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+```
+
+```powershell Remove multiple samples
+$samples = @(
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2'
+)
+$samples | ForEach-Object { Remove-FalconSample -Id $_ }
+```
+
+```powershell Pipeline removal
+'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' | Remove-FalconSample
+```
+
+</CodeGroup>
+
+<Warning>
+  This operation cannot be undone. Ensure you have proper authorization before removing samples.
+</Warning>
+
+---
+
+## Common Workflows
+
+### Upload and Analyze Sample
+
+```powershell
+# Upload sample file
+$result = Send-FalconSample -Path 'C:\Samples\suspicious.exe' -Comment 'Potential malware from endpoint'
+
+# Capture SHA256 for analysis
+$sha256 = $result.sha256
+
+# Submit to Falcon Sandbox for analysis
+Submit-FalconSandbox -Sha256 $sha256
+```
+
+### Download Multiple Samples
+
+```powershell
+# List of SHA256 hashes
+$hashes = @(
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2'
+)
+
+# Download each sample with password protection
+foreach ($hash in $hashes) {
+  $filename = "sample_$hash.zip"
+  Receive-FalconSample -Path "C:\Downloads\$filename" -Id $hash -PasswordProtected $true
+}
+```
+
+### Batch Upload Samples
+
+```powershell
+# Upload all executables from a directory
+Get-ChildItem 'C:\Quarantine\*.exe' | ForEach-Object {
+  $result = Send-FalconSample -Path $_.FullName -Comment "Quarantine upload - $($_.Name)"
+  [PSCustomObject]@{
+    FileName = $_.Name
+    SHA256 = $result.sha256
+    UploadTime = Get-Date
+  }
+} | Export-Csv 'C:\Logs\uploaded_samples.csv' -NoTypeInformation
+```
+
+---
+
+## Permissions Required
+
+| Operation | Permission |
+|-----------|------------|
+| Get-FalconSample | Sample uploads: Read |
+| Send-FalconSample | Sample uploads: Write |
+| Receive-FalconSample | Sample uploads: Read |
+| Remove-FalconSample | Sample uploads: Write |
+
+---
+
+## Related Commands
+
+- `Submit-FalconSandbox` - Submit samples for sandbox analysis
+- `Get-FalconQuickScan` - Submit samples for quick scanning
+- `Get-FalconMalQuery` - Search for similar samples in MalQuery

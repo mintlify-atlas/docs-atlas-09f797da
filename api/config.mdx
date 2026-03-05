@@ -1,0 +1,514 @@
+---
+title: "Configuration Management"
+description: "Export and import Falcon configuration files for backup, migration, and multi-CID management"
+---
+
+## Overview
+
+The Configuration Management API allows you to export your entire Falcon configuration as a portable archive and import it into another CID or restore it to the same CID. This is useful for:
+
+- **Backup and disaster recovery** - Regular configuration backups
+- **Multi-CID deployments** - Replicate configurations across environments
+- **Configuration migration** - Move policies and settings between test and production
+- **Audit and compliance** - Document configuration state at specific points in time
+
+<Warning>
+  Configuration import/export operations can modify or create multiple policies, groups, and settings. Always test in a non-production environment first.
+</Warning>
+
+## Export-FalconConfig
+
+Create a ZIP archive containing Falcon configuration files including groups, policies, exclusions, rules, and scripts.
+
+### Syntax
+
+```powershell
+Export-FalconConfig [[-Select] <string[]>] [-Force]
+```
+
+### Parameters
+
+<ParamField path="Select" type="string[]">
+  Selected items to export from your current CID. If not specified, all available items are exported.
+  
+  **Valid values:**
+  - `ContentPolicy`
+  - `DeviceControlPolicy`
+  - `FileVantagePolicy`
+  - `FileVantageRuleGroup`
+  - `FirewallGroup`
+  - `FirewallLocation`
+  - `FirewallPolicy`
+  - `HostGroup`
+  - `IoaExclusion`
+  - `IoaGroup`
+  - `Ioc`
+  - `MlExclusion`
+  - `PreventionPolicy`
+  - `ResponsePolicy`
+  - `Script`
+  - `SensorUpdatePolicy`
+  - `SvExclusion`
+  
+  **Aliases:** `Items`
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing export file when present.
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Export all configurations
+Export-FalconConfig
+```
+
+```powershell Export specific items
+Export-FalconConfig -Select HostGroup, PreventionPolicy, ResponsePolicy
+```
+
+```powershell Export firewall configuration
+Export-FalconConfig -Select FirewallPolicy, FirewallGroup, FirewallLocation -Force
+```
+
+```powershell Export policies only
+$policies = @(
+  'PreventionPolicy',
+  'ResponsePolicy',
+  'SensorUpdatePolicy',
+  'DeviceControlPolicy'
+)
+Export-FalconConfig -Select $policies
+```
+
+```powershell Export exclusions and IOCs
+Export-FalconConfig -Select IoaExclusion, MlExclusion, SvExclusion, Ioc
+```
+
+</CodeGroup>
+
+### Export Process
+
+The export process:
+
+1. Retrieves all selected items from your Falcon environment
+2. Identifies dependencies (e.g., Host Groups assigned to policies)
+3. Automatically includes dependent items in the export
+4. Saves each item type as a JSON file
+5. Creates a ZIP archive named `FalconConfig_<timestamp>.zip`
+6. Removes temporary JSON files
+
+### Returns
+
+Archive file information including full path, file size, and last write time.
+
+```powershell
+FullName                                    Length LastWriteTime
+--------                                    ------ -------------
+C:\Users\admin\FalconConfig_20240305T1430.zip  245678 3/5/2024 2:30:15 PM
+```
+
+<Note>
+  The export automatically includes dependencies. For example, exporting Prevention Policies will also export assigned Host Groups and IOA Rule Groups.
+</Note>
+
+---
+
+## Import-FalconConfig
+
+Import items from a FalconConfig archive into your Falcon environment.
+
+### Syntax
+
+```powershell
+Import-FalconConfig [-Path] <string> [[-Select] <string[]>] [-AssignExisting] [[-ModifyDefault] <string[]>] [[-ModifyExisting] <string[]>]
+```
+
+### Parameters
+
+<ParamField path="Path" type="string" required>
+  Path to the FalconConfig archive (.zip file) to import.
+</ParamField>
+
+<ParamField path="Select" type="string[]">
+  Import only selected items from the archive. If not specified, all items in the archive are imported.
+  
+  **Valid values:** Same as Export-FalconConfig
+</ParamField>
+
+<ParamField path="AssignExisting" type="switch">
+  Assign existing host groups with identical names to imported items. Without this switch, imported policies will not be assigned to any groups.
+  
+  **Aliases:** `Force`
+</ParamField>
+
+<ParamField path="ModifyDefault" type="string[]">
+  Modify default policies to match the import. Use `All` for all possible values or specify individual policy types.
+  
+  **Valid values:**
+  - `All`
+  - `ContentPolicy`
+  - `DeviceControlPolicy`
+  - `PreventionPolicy`
+  - `ResponsePolicy`
+  - `SensorUpdatePolicy`
+</ParamField>
+
+<ParamField path="ModifyExisting" type="string[]">
+  Modify existing items to match the import. Use `All` for all possible values or specify individual item types.
+  
+  **Valid values:** Same as Export-FalconConfig (including `All`)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+
+```powershell Import entire configuration
+Import-FalconConfig -Path 'C:\Backups\FalconConfig_20240305T1430.zip'
+```
+
+```powershell Import and assign to existing groups
+Import-FalconConfig -Path 'C:\Backups\FalconConfig.zip' -AssignExisting
+```
+
+```powershell Import specific items
+Import-FalconConfig -Path 'C:\Backups\FalconConfig.zip' -Select HostGroup, PreventionPolicy
+```
+
+```powershell Import and modify defaults
+Import-FalconConfig -Path 'C:\Backups\FalconConfig.zip' -ModifyDefault All -AssignExisting
+```
+
+```powershell Import and update existing
+Import-FalconConfig -Path 'C:\Backups\FalconConfig.zip' -ModifyExisting All -AssignExisting
+```
+
+```powershell Selective modification
+$modify = @('PreventionPolicy', 'ResponsePolicy', 'HostGroup')
+Import-FalconConfig -Path 'C:\Backups\FalconConfig.zip' -ModifyExisting $modify -AssignExisting
+```
+
+</CodeGroup>
+
+### Import Behavior
+
+<AccordionGroup>
+  <Accordion title="Default Behavior (No Switches)">
+    - Creates new items that don't exist
+    - Ignores items that already exist
+    - Does not modify any existing items
+    - Does not assign imported policies to host groups
+  </Accordion>
+  
+  <Accordion title="With -AssignExisting">
+    - Creates new items
+    - Matches host groups by name
+    - Assigns imported policies to matched host groups
+    - Still does not modify existing items
+  </Accordion>
+  
+  <Accordion title="With -ModifyDefault">
+    - Creates new items
+    - Modifies specified default policies to match import
+    - Useful for standardizing default policy settings
+  </Accordion>
+  
+  <Accordion title="With -ModifyExisting">
+    - Creates new items
+    - Modifies specified existing items to match import
+    - Updates policies, groups, exclusions, etc.
+    - Use with caution in production environments
+  </Accordion>
+</AccordionGroup>
+
+### Import Results
+
+The import process generates a CSV file with detailed results:
+
+```powershell
+time,api_client_id,type,id,name,platform,action,property,old_value,new_value,comment
+2024-03-05T14:30:15Z,abc123...,PreventionPolicy,def456...,Production Prevention,Windows,Created,,,
+2024-03-05T14:30:16Z,abc123...,HostGroup,ghi789...,Production Servers,,Modified,assignment_rule,old_rule,new_rule,
+```
+
+<Tip>
+  Always review the import results CSV to verify all changes were applied correctly.
+</Tip>
+
+---
+
+## Common Workflows
+
+### Backup Configuration
+
+```powershell
+# Create backup directory
+$backupDir = "C:\FalconBackups\$(Get-Date -Format 'yyyy-MM')"
+New-Item -Path $backupDir -ItemType Directory -Force
+
+# Change to backup directory
+Set-Location $backupDir
+
+# Export configuration
+Export-FalconConfig
+
+# Verify backup
+Get-ChildItem -Filter "FalconConfig_*.zip" | Select-Object Name, Length, LastWriteTime
+```
+
+### Migrate Configuration Between CIDs
+
+```powershell
+# Export from source CID
+Request-FalconToken -ClientId $sourceClientId -ClientSecret $sourceSecret
+Export-FalconConfig -Select PreventionPolicy, ResponsePolicy, HostGroup
+$archive = Get-ChildItem -Filter "FalconConfig_*.zip" | Select-Object -First 1
+
+# Import to target CID
+Request-FalconToken -ClientId $targetClientId -ClientSecret $targetSecret
+Import-FalconConfig -Path $archive.FullName -AssignExisting
+```
+
+### Clone Production to Test
+
+```powershell
+# Export from production
+Request-FalconToken -ClientId $prodClientId -ClientSecret $prodSecret
+Set-Location 'C:\Temp'
+Export-FalconConfig
+$prodConfig = Get-ChildItem -Filter "FalconConfig_*.zip" | Select-Object -First 1
+
+# Import to test environment
+Request-FalconToken -ClientId $testClientId -ClientSecret $testSecret
+Import-FalconConfig -Path $prodConfig.FullName -ModifyExisting All -AssignExisting
+
+Write-Host "Production configuration cloned to test environment"
+```
+
+### Scheduled Backup
+
+```powershell
+# Save as script: Backup-FalconConfig.ps1
+param(
+  [string]$ClientId,
+  [string]$ClientSecret,
+  [string]$BackupPath = "C:\FalconBackups"
+)
+
+# Create monthly backup folder
+$monthFolder = Join-Path $BackupPath (Get-Date -Format 'yyyy-MM')
+New-Item -Path $monthFolder -ItemType Directory -Force | Out-Null
+
+# Authenticate
+Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+
+# Change to backup directory
+Set-Location $monthFolder
+
+# Export configuration
+$result = Export-FalconConfig
+
+if ($result) {
+  Write-Host "Backup completed: $($result.FullName)"
+  
+  # Clean up old backups (keep last 6 months)
+  $oldBackups = Get-ChildItem -Path $BackupPath -Filter "FalconConfig_*.zip" -Recurse |
+    Where-Object { $_.LastWriteTime -lt (Get-Date).AddMonths(-6) }
+  
+  $oldBackups | ForEach-Object {
+    Write-Host "Removing old backup: $($_.FullName)"
+    Remove-Item $_.FullName -Force
+  }
+} else {
+  Write-Error "Backup failed"
+  exit 1
+}
+```
+
+### Selective Policy Update
+
+```powershell
+# Export specific policies from production
+Request-FalconToken -ClientId $prodClientId -ClientSecret $prodSecret
+Export-FalconConfig -Select PreventionPolicy, ResponsePolicy
+
+# Import and update only those policies in test
+Request-FalconToken -ClientId $testClientId -ClientSecret $testSecret
+$archive = Get-ChildItem -Filter "FalconConfig_*.zip" | Select-Object -First 1
+Import-FalconConfig -Path $archive.FullName -Select PreventionPolicy, ResponsePolicy -ModifyExisting All
+```
+
+### Disaster Recovery
+
+```powershell
+# Restore from most recent backup
+$backupDir = "C:\FalconBackups"
+$latestBackup = Get-ChildItem -Path $backupDir -Filter "FalconConfig_*.zip" -Recurse |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 1
+
+if ($latestBackup) {
+  Write-Host "Restoring from: $($latestBackup.FullName)"
+  Write-Host "Backup date: $($latestBackup.LastWriteTime)"
+  
+  $confirm = Read-Host "Continue with restore? (yes/no)"
+  
+  if ($confirm -eq 'yes') {
+    # Authenticate to target CID
+    Request-FalconToken -ClientId $clientId -ClientSecret $clientSecret
+    
+    # Restore configuration
+    Import-FalconConfig -Path $latestBackup.FullName -ModifyExisting All -AssignExisting
+    
+    Write-Host "Configuration restored successfully"
+  }
+} else {
+  Write-Error "No backup found in $backupDir"
+}
+```
+
+---
+
+## What Gets Exported
+
+The export includes all user-created configurations:
+
+### Policies
+- Prevention Policies (with settings and IOA rule groups)
+- Response Policies (with settings)
+- Sensor Update Policies (with settings and schedules)
+- Device Control Policies (with classes and exceptions)
+- Firewall Policies (with settings and rule groups)
+- File Vantage Policies (with rule groups and exclusions)
+- Content Update Policies
+
+### Groups and Rules
+- Host Groups (with assignment rules)
+- IOA Rule Groups (with custom rules)
+- Firewall Groups (with rules)
+- File Vantage Rule Groups (with rules)
+
+### Exclusions and Indicators
+- IOA Exclusions
+- ML Exclusions
+- Sensor Visibility Exclusions
+- Indicators of Compromise (IOCs)
+
+### Other Items
+- Firewall Locations
+- RTR Scripts
+
+<Warning>
+  Default policies and system-created items are exported but handled specially during import to prevent conflicts.
+</Warning>
+
+---
+
+## Permissions Required
+
+### Export Permissions
+
+For each item type being exported, you need **Read** permission:
+
+- Hosts: Read (for Host Groups)
+- Prevention Policies: Read
+- Response Policies: Read
+- Sensor Update Policies: Read
+- Device Control Policies: Read
+- Firewall Management: Read
+- IOA Rules: Read
+- Custom IOA Rules: Read
+- IOC Management: Read
+- Real Time Response Admin: Read (for Scripts)
+- File Vantage: Read
+
+### Import Permissions
+
+For each item type being imported, you need **Read** and **Write** permissions:
+
+- Hosts: Read, Write
+- Prevention Policies: Write
+- Response Policies: Write
+- Sensor Update Policies: Write
+- Device Control Policies: Write
+- Firewall Management: Write
+- IOA Rules: Write
+- Custom IOA Rules: Write
+- IOC Management: Write
+- Real Time Response Admin: Write
+- File Vantage: Write
+
+<Note>
+  In Flight Control environments, **Sensor Download: Read** permission is also required for CID comparison.
+</Note>
+
+---
+
+## Best Practices
+
+<CardGroup cols={2}>
+
+<Card title="Regular Backups" icon="clock">
+  Schedule automated backups before making major configuration changes. Keep backups for at least 6 months.
+</Card>
+
+<Card title="Test Before Production" icon="flask">
+  Always test imports in a test environment before applying to production. Verify all changes in the results CSV.
+</Card>
+
+<Card title="Version Control" icon="code-branch">
+  Store configuration archives in version control or secure backup storage with timestamps and change descriptions.
+</Card>
+
+<Card title="Document Changes" icon="file-lines">
+  Maintain a log of configuration imports/exports, including purpose, date, and who performed the operation.
+</Card>
+
+</CardGroup>
+
+---
+
+## Troubleshooting
+
+### Export Issues
+
+<AccordionGroup>
+  <Accordion title="Export fails with permission error">
+    Ensure your API credentials have **Read** permission for all item types being exported. Use `-Select` to export only items you have access to.
+  </Accordion>
+  
+  <Accordion title="Archive file is empty or very small">
+    Check if you have any user-created configurations. Default policies and system items may be filtered out. Use `-Detailed` to see what's being exported.
+  </Accordion>
+  
+  <Accordion title="Export hangs or times out">
+    Large environments may take several minutes. Try exporting specific item types separately using `-Select`.
+  </Accordion>
+</AccordionGroup>
+
+### Import Issues
+
+<AccordionGroup>
+  <Accordion title="Import creates duplicates">
+    Without `-ModifyExisting`, the import creates new items rather than updating existing ones. Use `-ModifyExisting` to update items with matching names.
+  </Accordion>
+  
+  <Accordion title="Policies not assigned to host groups">
+    Use the `-AssignExisting` switch to automatically assign imported policies to host groups with matching names.
+  </Accordion>
+  
+  <Accordion title="Some items failed to import">
+    Review the results CSV for failed items. Common causes include permission issues, naming conflicts, or missing dependencies.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Related Commands
+
+- `Get-FalconConfig` - View current configuration
+- `Compare-FalconConfig` - Compare configurations between CIDs
+- `Request-FalconToken` - Authenticate to switch between CIDs

@@ -1,0 +1,499 @@
+---
+title: Discover
+description: Asset discovery and inventory management across hosts, applications, accounts, and external assets
+icon: search-location
+---
+
+The Discover API provides comprehensive asset visibility across your organization, including endpoints, applications, user accounts, IoT devices, and external attack surface.
+
+## Overview
+
+Falcon Discover helps organizations maintain asset inventory and identify security gaps:
+
+- **Host discovery**: Managed and unmanaged endpoints
+- **Application inventory**: Installed software and browser extensions
+- **Account tracking**: User accounts and login events
+- **IoT devices**: Internet of Things and embedded systems
+- **External assets**: Public-facing infrastructure and domains
+
+## Host Assets
+
+### Search for hosts
+
+```powershell Get-FalconAsset
+Get-FalconAsset [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-Include <string[]>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (max: 100 for queries, 1000 for combined)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results (not valid with `-Detailed`)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties: `login_event`, `system_insights`, `third_party`, `risk_factors`
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information (uses combined endpoint with pagination via `After`)
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Example: List all unmanaged hosts**
+
+```powershell
+Get-FalconAsset -Filter "entity_type:'unmanaged'" -Detailed -All
+```
+
+**Example: Get hosts with recent login events**
+
+```powershell
+Get-FalconAsset -Filter "last_seen_timestamp:>'2024-01-01'" -Include login_event -Detailed -All
+```
+
+### Get host details by ID
+
+```powershell
+Get-FalconAsset -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Asset identifier(s) (AID values)
+</ParamField>
+
+## Applications
+
+### Search for applications
+
+```powershell Get-FalconAsset
+Get-FalconAsset -Application [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Include <string[]>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Application" type="switch" required>
+  Search for applications
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties: `browser_extension`, `host_info`, `install_usage`
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+**Example: Find applications by name**
+
+```powershell
+Get-FalconAsset -Application -Filter "name:*'Chrome'" -Detailed -All
+```
+
+**Example: Get applications with installation details**
+
+```powershell
+Get-FalconAsset -Application -Include install_usage,host_info -Detailed -All
+```
+
+### Get application details by ID
+
+```powershell
+Get-FalconAsset -Application -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Application identifier(s)
+</ParamField>
+
+## User Accounts
+
+### Search for user accounts
+
+```powershell Get-FalconAsset
+Get-FalconAsset -Account [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Account" type="switch" required>
+  Search for user account assets
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+**Example: Find privileged accounts**
+
+```powershell
+Get-FalconAsset -Account -Filter "admin_privileges:'Yes'" -Detailed -All
+```
+
+**Example: Search for accounts by username**
+
+```powershell
+Get-FalconAsset -Account -Filter "username:*'admin'" -Detailed -All
+```
+
+### Get account details by ID
+
+```powershell
+Get-FalconAsset -Account -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Account identifier(s)
+</ParamField>
+
+## Login Events
+
+### Search for login events
+
+```powershell Get-FalconAsset
+Get-FalconAsset -Login [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-Offset <int32>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Login" type="switch" required>
+  Search for login events
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+**Example: Get recent failed logins**
+
+```powershell
+Get-FalconAsset -Login -Filter "login_status:'Failed'+login_timestamp:>'2024-01-01'" -Detailed -All
+```
+
+**Example: Track logins by account**
+
+```powershell
+Get-FalconAsset -Login -Filter "account_name:'administrator'" -Detailed -All
+```
+
+### Get login event details by ID
+
+```powershell
+Get-FalconAsset -Login -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Login event identifier(s)
+</ParamField>
+
+## IoT Devices
+
+### Search for IoT devices
+
+```powershell Get-FalconAsset
+Get-FalconAsset -IoT [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-After <string>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="IoT" type="switch" required>
+  Search for IoT assets
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+**Example: List all IoT devices**
+
+```powershell
+Get-FalconAsset -IoT -Detailed -All
+```
+
+**Example: Find IoT devices by type**
+
+```powershell
+Get-FalconAsset -IoT -Filter "device_type:'IP Camera'" -Detailed -All
+```
+
+### Get IoT device details by ID
+
+```powershell
+Get-FalconAsset -IoT -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  IoT device identifier(s)
+</ParamField>
+
+## External Assets
+
+### Search for external assets
+
+```powershell Get-FalconAsset
+Get-FalconAsset -External [-Filter <string>] [-Sort <string>] [-Limit <int32>] [-After <string>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="External" type="switch" required>
+  Search for external assets
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+**Example: List external web servers**
+
+```powershell
+Get-FalconAsset -External -Filter "asset_type:'web_server'" -Detailed -All
+```
+
+**Example: Find assets by domain**
+
+```powershell
+Get-FalconAsset -External -Filter "domain:*'example.com'" -Detailed -All
+```
+
+### Get external asset details by ID
+
+```powershell
+Get-FalconAsset -External -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  External asset identifier(s)
+</ParamField>
+
+## Common Workflows
+
+### Inventory all assets
+
+```powershell
+# Get all hosts
+$Hosts = Get-FalconAsset -Detailed -All
+
+# Get all applications
+$Apps = Get-FalconAsset -Application -Detailed -All
+
+# Get all accounts
+$Accounts = Get-FalconAsset -Account -Detailed -All
+
+# Get IoT devices
+$IoT = Get-FalconAsset -IoT -Detailed -All
+
+# Get external assets
+$External = Get-FalconAsset -External -Detailed -All
+
+Write-Host "Total hosts: $($Hosts.Count)"
+Write-Host "Total applications: $($Apps.Count)"
+Write-Host "Total accounts: $($Accounts.Count)"
+Write-Host "Total IoT devices: $($IoT.Count)"
+Write-Host "Total external assets: $($External.Count)"
+```
+
+### Find unmanaged assets
+
+```powershell
+# Get unmanaged hosts
+$Unmanaged = Get-FalconAsset -Filter "entity_type:'unmanaged'" -Detailed -All
+
+foreach ($Host in $Unmanaged) {
+    Write-Host "Unmanaged: $($Host.hostname) - $($Host.ip_address)"
+    Write-Host "  Last seen: $($Host.last_seen_timestamp)"
+    Write-Host "  OS: $($Host.os_version)"
+}
+```
+
+### Track software installations
+
+```powershell
+# Find specific application
+$AppName = "Adobe Reader"
+$Apps = Get-FalconAsset -Application -Filter "name:*'$AppName'" -Include host_info,install_usage -Detailed -All
+
+foreach ($App in $Apps) {
+    Write-Host "$($App.name) $($App.version)"
+    Write-Host "  Installed on: $($App.host_count) hosts"
+    Write-Host "  Last used: $($App.last_used_timestamp)"
+}
+```
+
+### Audit privileged accounts
+
+```powershell
+# Get all admin accounts
+$Admins = Get-FalconAsset -Account -Filter "admin_privileges:'Yes'" -Detailed -All
+
+# Get recent login activity
+foreach ($Admin in $Admins) {
+    $Logins = Get-FalconAsset -Login -Filter "account_id:'$($Admin.id)'" -Detailed -All
+    
+    Write-Host "Admin: $($Admin.username)"
+    Write-Host "  Login count: $($Logins.Count)"
+    Write-Host "  Last login: $($Logins[0].login_timestamp)"
+}
+```
+
+### Monitor login patterns
+
+```powershell
+# Get failed login attempts in the last 24 hours
+$Since = (Get-Date).AddDays(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+$FailedLogins = Get-FalconAsset -Login -Filter "login_status:'Failed'+login_timestamp:>'$Since'" -Detailed -All
+
+# Group by account
+$FailedLogins | Group-Object account_name | Sort-Object Count -Descending | Select-Object Name, Count
+```
+
+### Discover IoT security risks
+
+```powershell
+# Get all IoT devices
+$IoTDevices = Get-FalconAsset -IoT -Detailed -All
+
+# Identify devices with vulnerabilities
+foreach ($Device in $IoTDevices) {
+    if ($Device.vulnerabilities -gt 0) {
+        Write-Host "$($Device.device_name) - $($Device.device_type)"
+        Write-Host "  IP: $($Device.ip_address)"
+        Write-Host "  Vulnerabilities: $($Device.vulnerabilities)"
+        Write-Host "  Firmware: $($Device.firmware_version)"
+    }
+}
+```
+
+### Map external attack surface
+
+```powershell
+# Get all external-facing web servers
+$WebServers = Get-FalconAsset -External -Filter "asset_type:'web_server'" -Detailed -All
+
+foreach ($Server in $WebServers) {
+    Write-Host "Server: $($Server.hostname)"
+    Write-Host "  IP: $($Server.ip_address)"
+    Write-Host "  Ports: $($Server.open_ports -join ', ')"
+    Write-Host "  SSL Grade: $($Server.ssl_grade)"
+    Write-Host "  Exposed services: $($Server.services -join ', ')"
+}
+```
+
+### Correlate hosts with login events
+
+```powershell
+# Get hosts with login event data included
+$Hosts = Get-FalconAsset -Filter "last_seen_timestamp:>'2024-01-01'" -Include login_event -Detailed -All
+
+foreach ($Host in $Hosts) {
+    Write-Host "Host: $($Host.hostname)"
+    
+    if ($Host.login_event) {
+        Write-Host "  Recent logins:"
+        foreach ($Login in $Host.login_event) {
+            Write-Host "    $($Login.account_name) - $($Login.login_timestamp) - $($Login.login_status)"
+        }
+    }
+}
+```
+
+## Asset Facets
+
+### Host Facets
+
+- `login_event`: Recent login activity on the host
+- `system_insights`: System configuration and security posture
+- `third_party`: Third-party integrations and connections
+- `risk_factors`: Identified security risks
+
+### Application Facets
+
+- `browser_extension`: Browser extensions associated with the application
+- `host_info`: Hosts where the application is installed
+- `install_usage`: Installation and usage statistics
+
+## Filter Examples
+
+### Host Filters
+
+```powershell
+# Operating system
+Get-FalconAsset -Filter "os_version:*'Windows 10'"
+
+# Network
+Get-FalconAsset -Filter "ip_address:'192.168.1.*'"
+
+# Time-based
+Get-FalconAsset -Filter "last_seen_timestamp:>'2024-01-01T00:00:00Z'"
+
+# Entity type
+Get-FalconAsset -Filter "entity_type:'managed'"
+```
+
+### Application Filters
+
+```powershell
+# Application name
+Get-FalconAsset -Application -Filter "name:*'Office'"
+
+# Vendor
+Get-FalconAsset -Application -Filter "vendor:'Microsoft'"
+
+# Version
+Get-FalconAsset -Application -Filter "version:*'2019'"
+```
+
+### Account Filters
+
+```powershell
+# Username
+Get-FalconAsset -Account -Filter "username:*'admin'"
+
+# Privileges
+Get-FalconAsset -Account -Filter "admin_privileges:'Yes'"
+
+# Account type
+Get-FalconAsset -Account -Filter "account_type:'Local'"
+```
+
+<Note>
+Requires **Falcon Discover: Read** and **Falcon Discover IoT: Read** permissions.
+</Note>
+
+<Tip>
+Use the `-Include` parameter with `-Detailed` to enrich host and application data with additional context in a single request.
+</Tip>

@@ -1,0 +1,278 @@
+---
+title: Quarantine Management
+description: Manage quarantined files detected by Falcon
+---
+
+Falcon Quarantine Management provides control over files that have been quarantined due to malicious or suspicious activity. Search for quarantined files, perform actions like release or delete, and validate action impacts before execution.
+
+## Get-FalconQuarantine
+
+Search for quarantined files.
+
+```powershell
+Get-FalconQuarantine -Filter "state:'quarantined'" -Detailed
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Quarantined file identifier(s) in format `[aid]_[sha256]`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Match phrase prefix for substring search
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Options: `hostname.asc`, `hostname.desc`, `username.asc`, `username.desc`, `date_updated.asc`, `date_updated.desc`, `date_created.asc`, `date_created.desc`, `paths.path.asc`, `paths.path.desc`, `paths.state.asc`, `paths.state.desc`, `state.asc`, `state.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example: List All Quarantined Files
+
+```powershell
+# Get all quarantined files with details
+$QuarantinedFiles = Get-FalconQuarantine -Filter "state:'quarantined'" -Detailed -All
+
+# Display summary
+$QuarantinedFiles | Select-Object hostname, paths.path, date_created | Format-Table
+```
+
+### Example: Search by Hostname
+
+```powershell
+# Find quarantined files on specific host
+$Hostname = "WORKSTATION-01"
+$Files = Get-FalconQuarantine -Filter "hostname:'$Hostname'" -Detailed
+
+# Review file details
+$Files | Select-Object paths, state, date_created
+```
+
+## Invoke-FalconQuarantineAction
+
+Perform actions on quarantined files.
+
+```powershell
+# Release a file from quarantine
+Invoke-FalconQuarantineAction -Action release -Id <quarantine_id> -Comment "False positive - approved by security team"
+```
+
+### Parameters
+
+<ParamField path="Action" type="string" required>
+  Action to perform: `release`, `unrelease`, `delete`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language statement (for filter-based actions)
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Match phrase prefix (for filter-based actions)
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="Id" type="string[]">
+  Quarantined file identifier(s)
+</ParamField>
+
+### Example: Release Files by ID
+
+```powershell
+# Release specific quarantined files
+$FileIds = @('aid1_sha256hash1', 'aid2_sha256hash2')
+Invoke-FalconQuarantineAction -Action release -Id $FileIds -Comment "Approved by security review"
+```
+
+### Example: Delete Files by Filter
+
+```powershell
+# Delete old quarantined files (older than 90 days)
+$NinetyDaysAgo = (Get-Date).AddDays(-90).ToString('yyyy-MM-ddTHH:mm:ssZ')
+Invoke-FalconQuarantineAction -Action delete -Filter "date_created:<'$NinetyDaysAgo'" -Comment "Cleanup old quarantined files"
+```
+
+### Example: Unrelease Files
+
+```powershell
+# Unrelease previously released files
+Invoke-FalconQuarantineAction -Action unrelease -Id <quarantine_id> -Comment "Re-quarantine due to updated threat intel"
+```
+
+## Test-FalconQuarantineAction
+
+Check the number of quarantined files potentially affected by a filter-based action.
+
+```powershell
+Test-FalconQuarantineAction -Filter "hostname:'WORKSTATION-*'"
+```
+
+### Parameters
+
+<ParamField path="Filter" type="string" required>
+  Falcon Query Language statement
+</ParamField>
+
+### Example: Validate Before Bulk Action
+
+```powershell
+# Check how many files would be affected
+$Filter = "state:'quarantined'+date_created:<'2024-01-01'"
+$Count = Test-FalconQuarantineAction -Filter $Filter
+
+Write-Host "$($Count.count) files would be affected by this action"
+
+if ($Count.count -lt 100) {
+    # Proceed with deletion if count is acceptable
+    Invoke-FalconQuarantineAction -Action delete -Filter $Filter -Comment "Cleanup old files"
+} else {
+    Write-Warning "Too many files would be affected. Please refine your filter."
+}
+```
+
+## Use Cases
+
+### False Positive Management
+
+```powershell
+# Find quarantined files by hash
+$SuspectedFalsePositive = Get-FalconQuarantine -Query "sha256hash" -Detailed
+
+# Review file details
+$SuspectedFalsePositive | Select-Object hostname, paths, date_created
+
+# Release if confirmed false positive
+if ($Confirmed) {
+    Invoke-FalconQuarantineAction -Action release -Id $SuspectedFalsePositive.id `
+        -Comment "False positive - legitimate application"
+}
+```
+
+### Quarantine Cleanup
+
+```powershell
+# Find old quarantined files
+$ThirtyDaysAgo = (Get-Date).AddDays(-30).ToString('yyyy-MM-ddTHH:mm:ssZ')
+$OldFiles = Get-FalconQuarantine -Filter "state:'quarantined'+date_created:<'$ThirtyDaysAgo'" -All
+
+Write-Host "Found $($OldFiles.Count) quarantined files older than 30 days"
+
+# Validate count before deletion
+$ValidationResult = Test-FalconQuarantineAction -Filter "state:'quarantined'+date_created:<'$ThirtyDaysAgo'"
+
+if ($ValidationResult.count -eq $OldFiles.Count) {
+    # Delete old files
+    Invoke-FalconQuarantineAction -Action delete -Id $OldFiles.id -Comment "Automated cleanup of old quarantined files"
+    Write-Host "Deleted $($ValidationResult.count) files"
+}
+```
+
+### Audit Quarantined Files by User
+
+```powershell
+# Get quarantined files for specific user
+$Username = "jdoe"
+$UserFiles = Get-FalconQuarantine -Filter "username:'$Username'" -Detailed -All
+
+# Generate report
+$Report = $UserFiles | Select-Object @{
+    Name = 'Hostname'
+    Expression = { $_.hostname }
+}, @{
+    Name = 'FilePath'
+    Expression = { $_.paths.path -join '; ' }
+}, @{
+    Name = 'State'
+    Expression = { $_.state }
+}, @{
+    Name = 'QuarantinedDate'
+    Expression = { $_.date_created }
+}
+
+$Report | Export-Csv -Path "quarantine_report_$Username.csv" -NoTypeInformation
+```
+
+### Targeted File Release
+
+```powershell
+# Find quarantined files on specific host
+$TargetHost = "WORKSTATION-05"
+$HostFiles = Get-FalconQuarantine -Filter "hostname:'$TargetHost'+state:'quarantined'" -Detailed
+
+# Review and selectively release
+foreach ($File in $HostFiles) {
+    Write-Host "File: $($File.paths.path)"
+    Write-Host "Date: $($File.date_created)"
+    
+    $Response = Read-Host "Release this file? (y/n)"
+    if ($Response -eq 'y') {
+        Invoke-FalconQuarantineAction -Action release -Id $File.id `
+            -Comment "Manual release after security review"
+        Write-Host "Released: $($File.paths.path)" -ForegroundColor Green
+    }
+}
+```
+
+### Bulk Release with Validation
+
+```powershell
+# Define files to release by filter
+$ReleaseFilter = "paths.path:'*\\TrustedApp.exe'"
+
+# Validate action scope
+$Validation = Test-FalconQuarantineAction -Filter $ReleaseFilter
+Write-Host "Action will affect $($Validation.count) files"
+
+# Confirm before proceeding
+$Confirm = Read-Host "Proceed with releasing $($Validation.count) files? (yes/no)"
+
+if ($Confirm -eq 'yes') {
+    Invoke-FalconQuarantineAction -Action release -Filter $ReleaseFilter `
+        -Comment "Bulk release of approved application"
+    Write-Host "Released $($Validation.count) files" -ForegroundColor Green
+} else {
+    Write-Host "Action cancelled" -ForegroundColor Yellow
+}
+```
+
+<Note>
+Requires **Quarantined Files: Read** scope for read operations and **Quarantined Files: Write** scope for performing actions.
+</Note>
+
+<Warning>
+Be cautious when releasing quarantined files. Always verify that files are legitimate before releasing them back to endpoints. Use the `Test-FalconQuarantineAction` cmdlet to validate the scope of filter-based actions before execution.
+</Warning>
+
+## Related Resources
+
+- [Quarantine Management Documentation](https://falcon.crowdstrike.com/documentation/page/quarantine-management)
+- [Malware Prevention Best Practices](https://www.crowdstrike.com/cybersecurity-101/malware/)

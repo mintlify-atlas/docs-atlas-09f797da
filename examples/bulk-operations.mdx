@@ -1,0 +1,597 @@
+---
+title: Bulk Operations
+description: Process thousands of hosts, detections, and IOCs using pagination and batching
+icon: layer-group
+---
+
+Handle large-scale operations efficiently using PSFalcon's built-in pagination and batch processing capabilities.
+
+## Understanding Pagination
+
+PSFalcon handles pagination automatically when using the `-All` parameter. For manual control, use `-Limit` and `-Offset`.
+
+```powershell
+# Automatic pagination - retrieves all results
+$AllHosts = Get-FalconHost -Detailed -All
+
+# Manual pagination - retrieve in batches of 1000
+$Offset = 0
+$Limit = 1000
+$AllResults = @()
+
+do {
+  $Batch = Get-FalconHost -Limit $Limit -Offset $Offset -Detailed
+  if ($Batch) {
+    $AllResults += $Batch
+    $Offset += $Limit
+    Write-Host "Retrieved $($AllResults.Count) hosts..."
+  }
+} while ($Batch.Count -eq $Limit)
+```
+
+<Note>
+  The maximum limit varies by API. Most endpoints support up to 5000 results per request, but some are limited to 1000 or 2000.
+</Note>
+
+## Bulk Host Operations
+
+### Process Thousands of Hosts by Filter
+
+Hide all stale hosts not seen in 30+ days.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidateRange(1,44)]
+  [int]$Days
+)
+
+# Create tracking file
+$OutputFile = Join-Path (Get-Location).Path "hidden_hosts_$(Get-Date -Format FileDateTime).csv"
+
+# Build filter for last_seen date
+$Filter = "last_seen:<'now-$($Days)d'"
+
+# Check total count first
+$Total = Get-FalconHost -Filter $Filter -Total
+Write-Host "Found $Total hosts not seen in $Days days"
+
+if ($Total -eq 0) {
+  Write-Host "No hosts to hide."
+  return
+}
+
+# Process in batches
+$ProcessedCount = 0
+$Offset = 0
+$Limit = 1000
+
+do {
+  # Retrieve batch of hosts
+  $Hosts = Get-FalconHost -Filter $Filter -Limit $Limit -Offset $Offset -Detailed
+  
+  if ($Hosts) {
+    # Hide hosts
+    $Hosts.device_id | Invoke-FalconHostAction -Name hide_host
+    
+    # Export to CSV for tracking
+    $Hosts | Select-Object device_id, hostname, last_seen, platform_name | 
+      Export-Csv -Path $OutputFile -NoTypeInformation -Append
+    
+    $ProcessedCount += $Hosts.Count
+    $Offset += $Limit
+    
+    Write-Host "Processed $ProcessedCount of $Total hosts..."
+    
+    # Rate limiting
+    Start-Sleep -Seconds 2
+  }
+} while ($Hosts.Count -eq $Limit)
+
+Write-Host "Completed: Hidden $ProcessedCount hosts"
+if (Test-Path $OutputFile) {
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+### Batch Containment from Multiple Sources
+
+Contain hosts from multiple CSV files and data sources.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string[]]$CsvFiles,
+  
+  [Parameter()]
+  [string[]]$AdditionalHostnames
+)
+
+# Output file
+$OutputFile = Join-Path (Get-Location).Path "bulk_containment_$(Get-Date -Format FileDateTime).csv"
+
+# Collect all hostnames from CSV files
+[System.Collections.Generic.List[string]]$AllHostnames = @()
+
+foreach ($File in $CsvFiles) {
+  if (Test-Path $File) {
+    $Import = Import-Csv -Path $File
+    if ($Import.hostname) {
+      @($Import.hostname).foreach{ $AllHostnames.Add($_) }
+      Write-Host "Loaded $($Import.Count) hostnames from $File"
+    }
+  } else {
+    Write-Warning "File not found: $File"
+  }
+}
+
+# Add additional hostnames
+if ($AdditionalHostnames) {
+  @($AdditionalHostnames).foreach{ $AllHostnames.Add($_) }
+}
+
+# Remove duplicates
+$UniqueHostnames = $AllHostnames | Select-Object -Unique
+Write-Host "Total unique hostnames: $($UniqueHostnames.Count)"
+
+# Process in batches of 100
+$BatchSize = 100
+$Results = @()
+
+for ($i = 0; $i -lt $UniqueHostnames.Count; $i += $BatchSize) {
+  $Batch = $UniqueHostnames[$i..([Math]::Min($i + $BatchSize - 1, $UniqueHostnames.Count - 1))]
+  
+  Write-Host "Processing batch $([Math]::Floor($i/$BatchSize) + 1)..."
+  
+  foreach ($Hostname in $Batch) {
+    # Find host (most recently seen)
+    $Host = Get-FalconHost -Filter "hostname:['$Hostname']" -Sort last_seen.desc -Limit 1 -Detailed
+    
+    if ($Host) {
+      # Attempt containment
+      $Action = $Host.device_id | Invoke-FalconHostAction -Name contain
+      
+      $Results += [PSCustomObject]@{
+        hostname = $Hostname
+        device_id = $Host.device_id
+        platform = $Host.platform_name
+        last_seen = $Host.last_seen
+        contained = if ($Action.id -eq $Host.device_id) { 'Success' } else { 'Failed' }
+      }
+    } else {
+      $Results += [PSCustomObject]@{
+        hostname = $Hostname
+        device_id = ''
+        platform = ''
+        last_seen = ''
+        contained = 'Not Found'
+      }
+    }
+  }
+  
+  # Rate limiting between batches
+  Start-Sleep -Seconds 5
+}
+
+# Export results
+$Results | Export-Csv -Path $OutputFile -NoTypeInformation
+
+# Summary
+$Contained = ($Results | Where-Object { $_.contained -eq 'Success' }).Count
+$Failed = ($Results | Where-Object { $_.contained -eq 'Failed' }).Count
+$NotFound = ($Results | Where-Object { $_.contained -eq 'Not Found' }).Count
+
+Write-Host "`nSummary:"
+Write-Host "  Total: $($Results.Count)"
+Write-Host "  Contained: $Contained"
+Write-Host "  Failed: $Failed"
+Write-Host "  Not Found: $NotFound"
+
+Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+```
+
+## Bulk Detection Operations
+
+### Process Thousands of Detections
+
+Assign and update status for all new critical detections.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$AssignToUsername
+)
+
+# Get user identifier
+$UserUuid = Get-FalconUser -Username $AssignToUsername
+if (!$UserUuid) {
+  throw "No user found for '$AssignToUsername'"
+}
+
+# Build filter
+$Filter = "status:'new'+max_severity_displayname:'Critical'"
+
+# Check total count
+$Total = Get-FalconDetection -Filter $Filter -Total
+Write-Host "Found $Total new critical detections"
+
+if ($Total -eq 0) {
+  Write-Host "No detections to process."
+  return
+}
+
+# Process in batches of 1000 (API limit)
+$ProcessedCount = 0
+
+do {
+  if ($ProcessedCount -gt 0) {
+    # Rate limiting between batches
+    Start-Sleep -Seconds 5
+  }
+  
+  # Get next batch of unassigned detections
+  $Param = @{
+    Filter = "status:'new'+max_severity_displayname:'Critical'+assigned_to_uuid:!'$UserUuid'"
+    Limit = 1000
+    OutVariable = 'DetectionIds'
+  }
+  
+  $Updated = Get-FalconDetection @Param | Edit-FalconDetection -AssignedToUuid $UserUuid -Status in_progress
+  
+  if ($Updated.writes.resources_affected) {
+    $ProcessedCount += $Updated.writes.resources_affected
+    Write-Host "Processed $ProcessedCount detections..."
+  }
+} while ($DetectionIds)
+
+Write-Host "Completed: Assigned $ProcessedCount detections to $AssignToUsername"
+```
+
+### Hide Detections in Bulk with Tracking
+
+Hide thousands of detections involving a specific file and track them.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Filename
+)
+
+# Output file to track hidden detections
+$OutputFile = Join-Path (Get-Location).Path "hidden_detections_$(Get-Date -Format FileDateTime).txt"
+
+# Verify detections exist
+$Total = Get-FalconDetection -Filter "behaviors.filename:'$Filename'" -Total
+
+if ($Total -eq 0) {
+  throw "No detections found for '$Filename'."
+}
+
+Write-Host "Found $Total detections to hide"
+$HiddenCount = 0
+
+do {
+  if ($HiddenCount -gt 0) {
+    # Rate limiting
+    Start-Sleep -Seconds 5
+  }
+  
+  # Hide in batches of 1000
+  $Edit = Get-FalconDetection -Filter "behaviors.filename:'$Filename'" -Limit 1000 -OutVariable Id |
+    Edit-FalconDetection -ShowInUi $false
+  
+  if ($Edit.writes.resources_affected) {
+    $HiddenCount += $Edit.writes.resources_affected
+    Write-Host "Hidden $HiddenCount of $Total detection(s)..."
+    
+    # Output detection IDs to file for audit trail
+    $Id | Out-File -FilePath $OutputFile -Append
+  }
+} while ($Id)
+
+Write-Host "Completed: Hidden $HiddenCount detections"
+
+if (Test-Path $OutputFile) {
+  Get-ChildItem $OutputFile | Select-Object FullName, Length, LastWriteTime
+}
+```
+
+## Bulk IOC Operations
+
+### Import Custom IOCs from CSV
+
+Create thousands of custom indicators from a CSV file.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('\.csv$')]
+  [ValidateScript({
+    if (Test-Path -Path $_ -PathType Leaf) {
+      $true
+    } else {
+      throw "Cannot find path '$_'"
+    }
+  })]
+  [string]$Path,
+  
+  [Parameter(Mandatory)]
+  [ValidateSet('detect', 'prevent', 'no_action', IgnoreCase=$false)]
+  [string]$Action,
+  
+  [Parameter()]
+  [string[]]$Tags
+)
+
+# Import CSV (expected columns: type, value, description)
+$Import = Import-Csv -Path $Path
+
+if (!$Import.type -or !$Import.value) {
+  throw "CSV must contain 'type' and 'value' columns"
+}
+
+Write-Host "Loaded $($Import.Count) indicators from CSV"
+
+# Process in batches of 1000 (API limit for bulk creation)
+$BatchSize = 1000
+$Created = 0
+$Failed = 0
+
+for ($i = 0; $i -lt $Import.Count; $i += $BatchSize) {
+  $Batch = $Import[$i..([Math]::Min($i + $BatchSize - 1, $Import.Count - 1))]
+  
+  Write-Host "Processing batch $([Math]::Floor($i/$BatchSize) + 1)..."
+  
+  # Build indicator objects
+  $Indicators = @($Batch).foreach{
+    $Ioc = @{
+      type = $_.type
+      value = $_.value
+      action = $Action
+      platforms = @('windows', 'mac', 'linux')
+      severity = 'medium'
+      applied_globally = $true
+    }
+    
+    if ($_.description) { $Ioc['description'] = $_.description }
+    if ($Tags) { $Ioc['tags'] = $Tags }
+    
+    [PSCustomObject]$Ioc
+  }
+  
+  # Bulk create IOCs
+  try {
+    $Result = $Indicators | New-FalconIoc
+    
+    if ($Result) {
+      $Created += @($Result).Count
+      Write-Host "  Created $(@($Result).Count) IOCs"
+    }
+  } catch {
+    Write-Error "Batch failed: $_"
+    $Failed += $Batch.Count
+  }
+  
+  # Rate limiting
+  Start-Sleep -Seconds 3
+}
+
+Write-Host "`nSummary:"
+Write-Host "  Total: $($Import.Count)"
+Write-Host "  Created: $Created"
+Write-Host "  Failed: $Failed"
+```
+
+### Bulk Update IOC Tags
+
+Update tags on thousands of existing IOCs.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter(Mandatory)]
+  [string]$Filter,
+  
+  [Parameter(Mandatory)]
+  [string[]]$NewTags
+)
+
+# Get all matching IOCs
+$Iocs = Get-FalconIoc -Filter $Filter -Detailed -All
+
+if (!$Iocs) {
+  throw "No IOCs found matching filter: $Filter"
+}
+
+Write-Host "Found $($Iocs.Count) IOCs to update"
+
+# Update in batches of 1000
+$BatchSize = 1000
+$Updated = 0
+
+for ($i = 0; $i -lt $Iocs.Count; $i += $BatchSize) {
+  $Batch = $Iocs[$i..([Math]::Min($i + $BatchSize - 1, $Iocs.Count - 1))]
+  
+  Write-Host "Processing batch $([Math]::Floor($i/$BatchSize) + 1)..."
+  
+  # Build update objects
+  $Updates = @($Batch).foreach{
+    [PSCustomObject]@{
+      id = $_.id
+      tags = $NewTags
+    }
+  }
+  
+  # Bulk update
+  $Result = $Updates | Edit-FalconIoc
+  
+  if ($Result) {
+    $Updated += @($Result).Count
+    Write-Host "  Updated $(@($Result).Count) IOCs"
+  }
+  
+  # Rate limiting
+  Start-Sleep -Seconds 3
+}
+
+Write-Host "Completed: Updated $Updated IOCs"
+```
+
+## Bulk Deletion Operations
+
+### Delete Expired IOCs in Bulk
+
+Remove thousands of expired or outdated indicators.
+
+```powershell
+#Requires -Version 5.1
+using module @{ModuleName='PSFalcon';ModuleVersion='2.2'}
+
+param(
+  [Parameter()]
+  [string]$Filter = "action:'no_action'",
+  
+  [Parameter()]
+  [switch]$WhatIf
+)
+
+# Get IOCs to delete
+$Iocs = Get-FalconIoc -Filter $Filter -All
+
+if (!$Iocs) {
+  Write-Host "No IOCs found matching filter: $Filter"
+  return
+}
+
+Write-Host "Found $($Iocs.Count) IOCs to delete"
+
+if ($WhatIf) {
+  Write-Host "WhatIf: Would delete $($Iocs.Count) IOCs"
+  return
+}
+
+# Confirm deletion
+$Confirm = Read-Host "Delete $($Iocs.Count) IOCs? (yes/no)"
+if ($Confirm -ne 'yes') {
+  Write-Host "Deletion cancelled"
+  return
+}
+
+# Delete in batches of 1000
+$BatchSize = 1000
+$Deleted = 0
+
+for ($i = 0; $i -lt $Iocs.Count; $i += $BatchSize) {
+  $Batch = $Iocs[$i..([Math]::Min($i + $BatchSize - 1, $Iocs.Count - 1))]
+  
+  Write-Host "Deleting batch $([Math]::Floor($i/$BatchSize) + 1)..."
+  
+  # Bulk delete by ID
+  $Batch.id | Remove-FalconIoc
+  
+  $Deleted += $Batch.Count
+  Write-Host "  Deleted $Deleted of $($Iocs.Count) IOCs"
+  
+  # Rate limiting
+  Start-Sleep -Seconds 3
+}
+
+Write-Host "Completed: Deleted $Deleted IOCs"
+```
+
+<Warning>
+  Always test bulk operations with filters and limits before running on production data. Use `-WhatIf` when available, or limit initial runs to small batches.
+</Warning>
+
+## Performance Best Practices
+
+### Rate Limiting Strategy
+
+```powershell
+# Implement progressive backoff on rate limit errors
+$MaxRetries = 3
+$RetryCount = 0
+$BackoffSeconds = 5
+
+do {
+  try {
+    # Perform bulk operation
+    $Result = Get-FalconHost -Filter $Filter -Limit 1000 -Offset $Offset -Detailed
+    $RetryCount = 0  # Reset on success
+    
+  } catch {
+    if ($_.Exception.Message -match '429|rate limit') {
+      $RetryCount++
+      
+      if ($RetryCount -le $MaxRetries) {
+        $WaitTime = $BackoffSeconds * $RetryCount
+        Write-Warning "Rate limit hit. Waiting $WaitTime seconds... (Retry $RetryCount/$MaxRetries)"
+        Start-Sleep -Seconds $WaitTime
+      } else {
+        throw "Max retries exceeded: $_"
+      }
+    } else {
+      throw $_
+    }
+  }
+} while ($Result.Count -eq 1000 -or $RetryCount -gt 0)
+```
+
+### Memory Management for Large Datasets
+
+```powershell
+# Use streaming to file instead of loading all into memory
+$OutputFile = 'large_export.csv'
+$Offset = 0
+$Limit = 5000
+$FirstBatch = $true
+
+do {
+  $Hosts = Get-FalconHost -Limit $Limit -Offset $Offset -Detailed
+  
+  if ($Hosts) {
+    # Append to CSV (write headers only on first batch)
+    if ($FirstBatch) {
+      $Hosts | Export-Csv -Path $OutputFile -NoTypeInformation
+      $FirstBatch = $false
+    } else {
+      $Hosts | Export-Csv -Path $OutputFile -NoTypeInformation -Append
+    }
+    
+    $Offset += $Limit
+    Write-Host "Exported $Offset hosts..."
+    
+    # Clear variable to free memory
+    $Hosts = $null
+    [System.GC]::Collect()
+  }
+} while ($Hosts -ne $null)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom IOC Workflows" icon="magnifying-glass" href="/examples/custom-ioc-workflows">
+    Automate indicator management
+  </Card>
+  <Card title="MSSP Operations" icon="buildings" href="/examples/mssp-operations">
+    Manage multiple customer CIDs
+  </Card>
+</CardGroup>

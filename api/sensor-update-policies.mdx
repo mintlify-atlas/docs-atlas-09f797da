@@ -1,0 +1,454 @@
+---
+title: Sensor Update Policies
+description: Manage Sensor Update policies to control Falcon sensor version deployment and scheduling
+---
+
+## Overview
+
+Sensor Update policies control which version of the Falcon sensor is deployed to endpoints and when updates occur. These policies allow you to manage sensor versions across your environment, ensuring controlled rollouts and maintenance windows.
+
+<Info>
+**Required API Scope:** `Sensor update policies: Read` (for read operations) or `Sensor update policies: Write` (for write operations)
+</Info>
+
+## Get Sensor Update Policies
+
+Search for and retrieve Sensor Update policies.
+
+```powershell Get-FalconSensorUpdatePolicy
+Get-FalconSensorUpdatePolicy [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Include] <string[]>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Policy identifier(s). Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  Example: `platform_name:'Windows'+enabled:true`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Valid values: `created_by.asc`, `created_by.desc`, `created_timestamp.asc`, `created_timestamp.desc`, `enabled.asc`, `enabled.desc`, `modified_by.asc`, `modified_by.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`, `platform_name.asc`, `platform_name.desc`, `precedence.asc`, `precedence.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties
+  
+  Valid values: `members`
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get all policies
+Get-FalconSensorUpdatePolicy -All -Detailed
+```
+
+```powershell Filter by platform
+Get-FalconSensorUpdatePolicy -Filter "platform_name:'Linux'" -Detailed
+```
+
+```powershell Get specific policy with members
+Get-FalconSensorUpdatePolicy -Id <policy_id> -Include members
+```
+</CodeGroup>
+
+## Create Sensor Update Policy
+
+Create new Sensor Update policies.
+
+```powershell New-FalconSensorUpdatePolicy
+New-FalconSensorUpdatePolicy -Name <string> -PlatformName <string> [[-Description] <string>] [[-Setting] <object>]
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Setting" type="object">
+  Policy settings controlling sensor version and update schedule
+  
+  Common properties:
+  - `build`: Sensor build version to deploy
+  - `scheduler`: Update scheduling configuration (enabled, timezone, start/end times)
+  - `uninstall_protection`: Enable/disable uninstall protection
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to create in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Create Windows policy with specific build
+$Settings = @{
+    build = '15507|n-1'
+    uninstall_protection = 'ENABLED'
+}
+New-FalconSensorUpdatePolicy -Name 'Windows Production' -PlatformName 'Windows' -Description 'N-1 build for production' -Setting $Settings
+```
+
+```powershell Create policy with update schedule
+$Settings = @{
+    build = 'latest'
+    scheduler = @{
+        enabled = $true
+        timezone = 'America/New_York'
+        start_hour = 22
+        end_hour = 2
+    }
+}
+New-FalconSensorUpdatePolicy -Name 'Linux Scheduled Updates' -PlatformName 'Linux' -Setting $Settings
+```
+</CodeGroup>
+
+## Edit Sensor Update Policy
+
+Modify existing Sensor Update policies.
+
+```powershell Edit-FalconSensorUpdatePolicy
+Edit-FalconSensorUpdatePolicy -Id <string> [[-Name] <string>] [[-Description] <string>] [[-Setting] <object>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Policy name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Setting" type="object">
+  Policy settings to update
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to modify in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Update sensor build
+$UpdatedSettings = @{ build = '15508' }
+Edit-FalconSensorUpdatePolicy -Id <policy_id> -Setting $UpdatedSettings
+```
+
+```powershell Disable update scheduler
+$UpdatedSettings = @{
+    scheduler = @{ enabled = $false }
+}
+Edit-FalconSensorUpdatePolicy -Id <policy_id> -Setting $UpdatedSettings
+```
+</CodeGroup>
+
+## Remove Sensor Update Policy
+
+Remove Sensor Update policies.
+
+```powershell Remove-FalconSensorUpdatePolicy
+Remove-FalconSensorUpdatePolicy -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifier(s) to remove. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Example
+
+```powershell
+Remove-FalconSensorUpdatePolicy -Id <policy_id>
+```
+
+## Policy Actions
+
+Perform actions on Sensor Update policies such as enabling/disabling or assigning to host groups.
+
+```powershell Invoke-FalconSensorUpdatePolicyAction
+Invoke-FalconSensorUpdatePolicyAction -Name <string> [[-GroupId] <string>] -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform
+  
+  Valid values: `add-host-group`, `disable`, `enable`, `remove-host-group`
+</ParamField>
+
+<ParamField path="GroupId" type="string">
+  Host group identifier. Pattern: `^[a-fA-F0-9]{32}$`
+  
+  Required for: `add-host-group`, `remove-host-group`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Enable policy
+Invoke-FalconSensorUpdatePolicyAction -Name enable -Id <policy_id>
+```
+
+```powershell Assign to host group
+Invoke-FalconSensorUpdatePolicyAction -Name add-host-group -GroupId <group_id> -Id <policy_id>
+```
+</CodeGroup>
+
+## Get Policy Members
+
+Search for members (hosts) assigned to Sensor Update policies.
+
+```powershell Get-FalconSensorUpdatePolicyMember
+Get-FalconSensorUpdatePolicyMember [[-Id] <string>] [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string">
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+Get-FalconSensorUpdatePolicyMember -Id <policy_id> -Detailed -All
+```
+
+## Set Policy Precedence
+
+Set Sensor Update policy precedence order for a specific platform.
+
+```powershell Set-FalconSensorUpdatePrecedence
+Set-FalconSensorUpdatePrecedence -PlatformName <string> -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifiers in desired precedence order (highest to lowest priority). Pattern: `^[a-fA-F0-9]{32}$`
+  
+  <Note>All policy identifiers must be supplied in order, with the exception of the `platform_default` policy.</Note>
+</ParamField>
+
+### Example
+
+```powershell
+$PolicyOrder = @('<policy_id_1>', '<policy_id_2>', '<policy_id_3>')
+Set-FalconSensorUpdatePrecedence -PlatformName 'Windows' -Id $PolicyOrder
+```
+
+## Get Available Sensor Builds
+
+Retrieve available Falcon Sensor builds for assignment in policies.
+
+```powershell Get-FalconBuild
+Get-FalconBuild [[-Platform] <string>] [[-Stage] <string[]>]
+```
+
+### Parameters
+
+<ParamField path="Platform" type="string">
+  Operating system platform
+  
+  Valid values: `linux`, `mac`, `windows` (case-sensitive)
+</ParamField>
+
+<ParamField path="Stage" type="string[]">
+  Sensor release stage
+  
+  Valid values: `early_adopter`, `prod`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get all available builds
+Get-FalconBuild
+```
+
+```powershell Get Windows production builds
+Get-FalconBuild -Platform windows -Stage prod
+```
+</CodeGroup>
+
+## Get Kernel Compatibility
+
+Search for Falcon kernel compatibility information for Sensor builds (Linux).
+
+```powershell Get-FalconKernel
+Get-FalconKernel [[-Field] <string>] [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Offset] <int>] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Field" type="string">
+  Return values for a specific field
+  
+  Valid values: `architecture`, `base_package_supported_sensor_versions`, `distro`, `distro_version`, `flavor`, `release`, `vendor`, `version`, `ztl_supported_sensor_versions`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-500)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+Get-FalconKernel -Filter "distro:'Ubuntu'" -All
+```
+
+## Get Uninstall Token
+
+Retrieve an uninstallation or maintenance token for a host.
+
+```powershell Get-FalconUninstallToken
+Get-FalconUninstallToken [[-AuditMessage] <string>] [[-Include] <string[]>] -Id <string>
+```
+
+### Parameters
+
+<ParamField path="AuditMessage" type="string">
+  Audit log comment for token retrieval
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional host properties
+  
+  Valid values: `agent_version`, `cid`, `external_ip`, `first_seen`, `hostname`, `last_seen`, `local_ip`, `mac_address`, `os_build`, `os_version`, `platform_name`, `product_type`, `product_type_desc`, `serial_number`, `system_manufacturer`, `system_product_name`, `tags`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Host identifier or `MAINTENANCE` for maintenance token. Pattern: `^([a-fA-F0-9]{32}|MAINTENANCE)$`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get uninstall token
+Get-FalconUninstallToken -Id <device_id> -AuditMessage 'Decommissioning server'
+```
+
+```powershell Get maintenance token
+Get-FalconUninstallToken -Id MAINTENANCE
+```
+</CodeGroup>
+
+<Warning>
+Uninstall tokens allow removal of the Falcon sensor. Store and use them securely. Maintenance tokens provide temporary uninstall protection bypass.
+</Warning>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Prevention Policies" icon="shield-halved" href="/api/prevention-policies">
+    Manage Prevention policies
+  </Card>
+  <Card title="Device Control Policies" icon="usb" href="/api/device-control-policies">
+    Control USB and Bluetooth device usage
+  </Card>
+</CardGroup>

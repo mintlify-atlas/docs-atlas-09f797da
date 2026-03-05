@@ -1,0 +1,568 @@
+---
+title: 'RTR Admin Commands'
+description: 'Administrative Real-time Response commands with full system access'
+icon: 'shield-halved'
+---
+
+## Overview
+
+RTR Admin commands provide full read/write access to hosts, enabling system remediation, file deployment, and advanced response actions. These commands require elevated permissions and should be used with caution.
+
+<Warning>
+Admin commands can modify host systems. Always verify commands before execution and follow your organization's change management procedures.
+</Warning>
+
+## Administrative Commands
+
+### Invoke-FalconAdminCommand
+
+Execute administrative RTR commands with write access to the host system.
+
+<ParamField path="Command" type="string" required>
+  Real-time Response admin command to execute. Available commands:
+  - `cat` - Display file contents
+  - `cd` - Change directory  
+  - `clear` - Clear screen
+  - `cp` - Copy files
+  - `csrutil` - Check SIP status (macOS)
+  - `cswindiag` - Collect CrowdStrike diagnostic data
+  - `encrypt` - Encrypt files
+  - `env` - Display environment variables
+  - `eventlog backup` - Backup event logs
+  - `eventlog export` - Export event logs
+  - `eventlog list` - List event logs
+  - `eventlog view` - View event logs
+  - `falconscript` - Execute FalconScript library script
+  - `filehash` - Calculate file hash
+  - `get` - Retrieve file from host
+  - `getsid` - Get security identifier
+  - `help` - Display available commands
+  - `history` - Show command history
+  - `ifconfig` - Display network config (Unix/macOS)
+  - `ipconfig` - Display network config (Windows)
+  - `kill` - Terminate process
+  - `ls` - List directory contents
+  - `map` - Map network drive
+  - `memdump` - Dump process memory
+  - `mkdir` - Create directory
+  - `mount` - Display mounted filesystems
+  - `mv` - Move/rename files
+  - `netstat` - Display network connections
+  - `ps` - List running processes
+  - `put` - Deploy file to host
+  - `put-and-run` - Deploy and execute file
+  - `reg delete` - Delete registry key/value
+  - `reg load` - Load registry hive
+  - `reg query` - Query registry
+  - `reg set` - Set registry value
+  - `reg unload` - Unload registry hive
+  - `restart` - Restart host
+  - `rm` - Remove files
+  - `run` - Execute program
+  - `runscript` - Execute custom script
+  - `shutdown` - Shutdown host
+  - `tar` - Create/extract tar archives
+  - `umount` - Unmount filesystem
+  - `unmap` - Unmap network drive
+  - `update history` - View update history
+  - `update install` - Install updates
+  - `update list` - List available updates
+  - `update query` - Query update status
+  - `users` - List logged-in users
+  - `xmemdump` - Extended memory dump
+  - `zip` - Create/extract zip archives
+</ParamField>
+
+<ParamField path="Argument" type="string">
+  Arguments to include with the command.
+</ParamField>
+
+<ParamField path="SessionId" type="string">
+  Session identifier for single-host execution.
+</ParamField>
+
+<ParamField path="BatchId" type="string">
+  Batch session identifier for multi-host execution.
+</ParamField>
+
+<ParamField path="OptionalHostId" type="string[]">
+  Restrict batch execution to specific host identifiers.
+</ParamField>
+
+<ParamField path="Timeout" type="int32" default="30">
+  Length of time to wait for a result, in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="HostTimeout" type="int32">
+  Length of time to wait for a result from target host(s), in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="Wait" type="switch">
+  Automatically poll for command completion using `Confirm-FalconAdminCommand` or `Confirm-FalconGetFile`.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Kill Malicious Process
+# Terminate a suspicious process by PID
+$Result = Invoke-FalconAdminCommand -Command kill `
+  -Argument '1234' `
+  -SessionId $Session.session_id -Wait
+
+if ($Result.complete) {
+  Write-Host "Process terminated: $($Result.stdout)"
+}
+```
+
+```powershell Example: Delete Malicious File
+# Remove a malicious file from the host
+$Remove = Invoke-FalconAdminCommand -Command rm `
+  -Argument 'C:\\Temp\\malware.exe' `
+  -SessionId $Session.session_id -Wait
+```
+
+```powershell Example: Registry Remediation
+# Delete malicious registry key
+$RegDelete = Invoke-FalconAdminCommand -Command 'reg delete' `
+  -Argument 'HKLM\\Software\\Malicious\\Key' `
+  -SessionId $Session.session_id -Wait
+```
+
+### Confirm-FalconAdminCommand
+
+Verify the status of an admin command (required to acknowledge command completion).
+
+<ParamField path="CloudRequestId" type="string" required>
+  Command request identifier returned from `Invoke-FalconAdminCommand`.
+</ParamField>
+
+<ParamField path="SequenceId" type="int32" default="0">
+  Sequence identifier for command ordering.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Confirm Admin Command
+# Issue command without -Wait
+$Command = Invoke-FalconAdminCommand -Command kill -Argument '1234' `
+  -SessionId $Session.session_id
+
+# Poll for completion
+do {
+  Start-Sleep -Seconds 2
+  $Status = Confirm-FalconAdminCommand -CloudRequestId $Command.cloud_request_id
+} until ($Status.complete -eq $true)
+
+Write-Host $Status.stdout
+```
+
+## File Operations
+
+### Retrieve Files from Hosts
+
+The `get` command retrieves files from hosts and the `Receive-FalconGetFile` cmdlet downloads them.
+
+```powershell Example: Retrieve Suspicious File
+# Get file from host
+$GetFile = Invoke-FalconAdminCommand -Command get `
+  -Argument 'C:\\Users\\Public\\suspicious.dll' `
+  -SessionId $Session.session_id -Wait
+
+# Confirm file transfer completed
+$FileInfo = Confirm-FalconGetFile -SessionId $Session.session_id `
+  -Sha256 $GetFile.sha256
+
+if ($FileInfo.complete) {
+  # Download the 7z archive (password: 'infected')
+  Receive-FalconGetFile -SessionId $Session.session_id `
+    -Sha256 $FileInfo.sha256 `
+    -Path "./evidence/$($FileInfo.sha256).7z"
+  
+  Write-Host "File retrieved: $($FileInfo.name)"
+}
+```
+
+### Confirm-FalconGetFile
+
+Verify the status of a 'get' command and retrieve file metadata.
+
+<ParamField path="SessionId" type="string">
+  Session identifier for single-host file retrieval.
+</ParamField>
+
+<ParamField path="BatchGetCmdReqId" type="string">
+  Batch 'get' command identifier for multi-host retrieval.
+</ParamField>
+
+<ParamField path="Timeout" type="int32" default="30">
+  Length of time to wait for a result, in seconds. Valid range: 1-600.
+</ParamField>
+
+**Required Permission:** `Real time response: Write`
+
+### Receive-FalconGetFile
+
+Download a password-protected 7z archive containing a retrieved file.
+
+<Warning>
+All retrieved files are compressed with 7z and encrypted with the password: `infected`
+</Warning>
+
+<ParamField path="Sha256" type="string" required>
+  SHA256 hash value of the retrieved file (from `Confirm-FalconGetFile`).
+</ParamField>
+
+<ParamField path="SessionId" type="string" required>
+  Session identifier used during file retrieval.
+</ParamField>
+
+<ParamField path="Path" type="string">
+  Destination path for the downloaded archive. Defaults to current directory with SHA256 as filename.
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite existing file if present.
+</ParamField>
+
+**Required Permission:** `Real time response: Write`
+
+### Remove-FalconGetFile
+
+Delete a previously retrieved file from CrowdStrike storage.
+
+<ParamField path="SessionId" type="string" required>
+  Session identifier used during file retrieval.
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Real-time Response 'get' file identifier.
+</ParamField>
+
+**Required Permission:** `Real time response: Write`
+
+```powershell Example: Clean Up Retrieved Files
+# Remove file from cloud storage
+Remove-FalconGetFile -SessionId $Session.session_id -Id $FileInfo.id
+```
+
+## Put File Operations
+
+### Get-FalconPutFile
+
+Search for RTR 'put' files available for deployment.
+
+<ParamField path="Id" type="string[]">
+  Put file identifier(s) to retrieve.
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to filter results.
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results.
+</ParamField>
+
+<ParamField path="Limit" type="int32" default="100">
+  Maximum number of results per request. Valid range: 1-100.
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information.
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Retrieve all available results.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: List Available Put Files
+# Get all put files
+$PutFiles = Get-FalconPutFile -Detailed -All
+
+foreach ($File in $PutFiles) {
+  Write-Host "$($File.name) - $($File.description)"
+}
+```
+
+### Send-FalconPutFile
+
+Upload a file for deployment via RTR 'put' command.
+
+<ParamField path="Path" type="string" required>
+  Path to local file to upload.
+</ParamField>
+
+<ParamField path="Name" type="string">
+  File name (defaults to source filename). Max length: 32766 characters.
+</ParamField>
+
+<ParamField path="Description" type="string">
+  File description for identification.
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Comment for audit log. Max length: 4096 characters.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+```powershell Example: Upload Response Tool
+# Upload remediation script
+$PutFile = Send-FalconPutFile -Path './tools/cleanup.ps1' `
+  -Name 'cleanup.ps1' `
+  -Description 'Malware cleanup script' `
+  -Comment 'Uploaded for incident response'
+
+Write-Host "Put file ID: $($PutFile.id)"
+```
+
+### Deploy Put File to Hosts
+
+```powershell Example: Deploy and Execute
+# Deploy file to host using 'put' command
+$Deploy = Invoke-FalconAdminCommand -Command put `
+  -Argument 'cleanup.ps1' `
+  -SessionId $Session.session_id -Wait
+
+# Execute the deployed file
+if ($Deploy.complete) {
+  $Execute = Invoke-FalconAdminCommand -Command run `
+    -Argument 'powershell.exe -File cleanup.ps1' `
+    -SessionId $Session.session_id -Wait
+  
+  Write-Host "Execution result: $($Execute.stdout)"
+}
+```
+
+### Receive-FalconPutFile
+
+Download a 'put' file from CrowdStrike storage.
+
+<ParamField path="Id" type="string" required>
+  Put file identifier.
+</ParamField>
+
+<ParamField path="Path" type="string" required>
+  Destination path for downloaded file.
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite existing file if present.
+</ParamField>
+
+**Required Permission:** `Real time response: Write`
+
+### Remove-FalconPutFile
+
+Delete a 'put' file from CrowdStrike storage.
+
+<ParamField path="Id" type="string" required>
+  Put file identifier to remove.
+</ParamField>
+
+**Required Permission:** `Real time response (admin): Write`
+
+## Batch File Retrieval
+
+### Invoke-FalconBatchGet
+
+Retrieve files from multiple hosts simultaneously.
+
+<ParamField path="FilePath" type="string" required>
+  Path to file on target hosts.
+</ParamField>
+
+<ParamField path="BatchId" type="string" required>
+  Batch session identifier.
+</ParamField>
+
+<ParamField path="OptionalHostId" type="string[]">
+  Restrict execution to specific host identifiers within the batch.
+</ParamField>
+
+<ParamField path="Timeout" type="int32" default="30">
+  Length of time to wait for a result, in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="HostTimeout" type="int32">
+  Length of time to wait for results from target hosts, in seconds. Valid range: 1-600.
+</ParamField>
+
+<ParamField path="Wait" type="switch">
+  Automatically poll for completion using `Confirm-FalconGetFile`.
+</ParamField>
+
+**Required Permission:** `Real time response: Write`
+
+```powershell Example: Batch File Collection
+# Retrieve suspicious file from multiple hosts
+$HostIds = Get-FalconHost -Filter "platform_name:'Windows'" | 
+  Select-Object -ExpandProperty device_id -First 5
+
+# Start batch session
+$Batch = Start-FalconSession -Id $HostIds
+
+# Retrieve file from all hosts
+$BatchGet = Invoke-FalconBatchGet -FilePath 'C:\\Temp\\suspicious.dll' `
+  -BatchId $Batch.batch_id -Wait
+
+# Process results for each host
+foreach ($HostResult in $BatchGet.hosts) {
+  if ($HostResult.complete -and $HostResult.sha256) {
+    Write-Host "Retrieved from $($HostResult.aid): $($HostResult.sha256)"
+    
+    # Download file
+    Receive-FalconGetFile -SessionId $HostResult.session_id `
+      -Sha256 $HostResult.sha256 `
+      -Path "./evidence/$($HostResult.aid)_$($HostResult.sha256).7z"
+  } else {
+    Write-Warning "Failed for $($HostResult.aid): $($HostResult.errors.message)"
+  }
+}
+
+# Clean up
+Remove-FalconSession -Id $Batch.batch_id
+```
+
+## Advanced Workflows
+
+<Steps>
+  <Step title="Incident Response: Contain and Remediate">
+    Complete workflow for responding to a security incident.
+    
+    ```powershell
+    # 1. Start session with compromised host
+    $Session = Start-FalconSession -Id $CompromisedHostId
+    
+    # 2. Collect evidence
+    $Processes = Invoke-FalconAdminCommand -Command ps `
+      -SessionId $Session.session_id -Wait
+    
+    # 3. Retrieve malicious file
+    $GetMalware = Invoke-FalconAdminCommand -Command get `
+      -Argument 'C:\\Temp\\malware.exe' `
+      -SessionId $Session.session_id -Wait
+    
+    # 4. Download for analysis
+    $FileInfo = Confirm-FalconGetFile -SessionId $Session.session_id
+    Receive-FalconGetFile -SessionId $Session.session_id `
+      -Sha256 $FileInfo.sha256 -Path './evidence/malware.7z'
+    
+    # 5. Terminate malicious process
+    $Kill = Invoke-FalconAdminCommand -Command kill `
+      -Argument '5678' -SessionId $Session.session_id -Wait
+    
+    # 6. Remove malicious file
+    $Remove = Invoke-FalconAdminCommand -Command rm `
+      -Argument 'C:\\Temp\\malware.exe' `
+      -SessionId $Session.session_id -Wait
+    
+    # 7. Clean up
+    Remove-FalconSession -Id $Session.session_id
+    ```
+  </Step>
+  
+  <Step title="Mass Remediation Across Fleet">
+    Deploy remediation across multiple hosts.
+    
+    ```powershell
+    # Upload remediation script
+    $RemediationScript = Send-FalconPutFile `
+      -Path './scripts/remove-persistence.ps1' `
+      -Name 'remediation.ps1' `
+      -Description 'Remove malware persistence'
+    
+    # Get affected hosts
+    $AffectedHosts = Get-FalconHost -Filter "tags:'infected'" | 
+      Select-Object -ExpandProperty device_id
+    
+    # Start batch session
+    $Batch = Start-FalconSession -Id $AffectedHosts -QueueOffline $true
+    
+    # Deploy and execute remediation
+    $Deploy = Invoke-FalconAdminCommand -Command 'put-and-run' `
+      -Argument 'remediation.ps1' `
+      -BatchId $Batch.batch_id
+    
+    # Monitor results
+    foreach ($Host in $Deploy) {
+      if ($Host.complete) {
+        Write-Host "Remediated: $($Host.aid)"
+      } else {
+        Write-Warning "Failed: $($Host.aid) - $($Host.errors.message)"
+      }
+    }
+    
+    # Clean up
+    Remove-FalconSession -Id $Batch.batch_id
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Warning>
+**Safety Considerations**
+- Always test admin commands on non-production systems first
+- Verify file paths and arguments before execution
+- Use `-Wait` parameter to ensure command completion
+- Maintain audit trails of all administrative actions
+- Follow the principle of least privilege
+</Warning>
+
+<Note>
+**Performance Optimization**
+- Use batch sessions for multi-host operations
+- Set appropriate timeout values for long-running commands
+- Clean up retrieved files with `Remove-FalconGetFile` to free storage
+- Remove put files when no longer needed
+</Note>
+
+## Error Handling
+
+```powershell Robust Admin Command Execution
+function Invoke-SafeRTRAdmin {
+  param(
+    [string]$SessionId,
+    [string]$Command,
+    [string]$Argument
+  )
+  
+  try {
+    # Execute admin command with wait
+    $Result = Invoke-FalconAdminCommand -Command $Command `
+      -Argument $Argument -SessionId $SessionId -Wait
+    
+    # Check for completion
+    if (-not $Result.complete) {
+      throw "Command did not complete within timeout period"
+    }
+    
+    # Check for errors
+    if ($Result.errors) {
+      throw "Command error: $($Result.errors.message)"
+    }
+    
+    # Check stderr
+    if ($Result.stderr) {
+      Write-Warning "Command stderr: $($Result.stderr)"
+    }
+    
+    return $Result
+  } catch {
+    Write-Error "RTR Admin Command Failed: $_"
+    throw
+  }
+}
+
+# Usage
+$Result = Invoke-SafeRTRAdmin -SessionId $Session.session_id `
+  -Command 'kill' -Argument '1234'
+```
+
+## Related APIs
+
+- [Real-time Response](/api/real-time-response) - Session management and read-only commands
+- [RTR Scripts](/api/rtr-scripts) - Custom script management and execution

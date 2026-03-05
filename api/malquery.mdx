@@ -1,0 +1,356 @@
+---
+title: "MalQuery"
+description: "Hunt for malware and analyze samples using Falcon MalQuery"
+---
+
+Search the CrowdStrike malware repository using YARA rules, exact searches, and fuzzy searches to identify and analyze malicious files.
+
+## Cmdlets
+
+### Get-FalconMalQuery
+
+Verify the status and results of an asynchronous Falcon MalQuery request, such as a hunt or exact-search.
+
+**Permissions**: `MalQuery: Read`
+
+<ParamField path="Id" type="string" required>
+  Request identifier (UUID format)
+</ParamField>
+
+```powershell Example
+# Check the status of a MalQuery hunt
+Get-FalconMalQuery -Id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+```
+
+---
+
+### Get-FalconMalQueryQuota
+
+Retrieve Falcon MalQuery search and download quotas.
+
+**Permissions**: `MalQuery: Read`
+
+```powershell Example
+# Check your MalQuery quota usage
+Get-FalconMalQueryQuota
+```
+
+---
+
+### Get-FalconMalQuerySample
+
+Retrieve Falcon MalQuery indexed file metadata.
+
+**Permissions**: `MalQuery: Read`
+
+<ParamField path="Id" type="string[]" required>
+  SHA256 hash value
+</ParamField>
+
+```powershell Example
+# Get metadata for a specific sample
+Get-FalconMalQuerySample -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+# Get metadata for multiple samples
+$Hashes = @(
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+)
+Get-FalconMalQuerySample -Id $Hashes
+```
+
+---
+
+### Group-FalconMalQuerySample
+
+Schedule MalQuery samples for download.
+
+**Permissions**: `MalQuery: Write`
+
+<ParamField path="Id" type="string[]" required>
+  SHA256 hash value
+</ParamField>
+
+```powershell Example
+# Schedule samples for batch download
+$Samples = @(
+    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
+)
+Group-FalconMalQuerySample -Id $Samples
+```
+
+---
+
+### Invoke-FalconMalQuery
+
+Initiate a Falcon MalQuery YARA hunt, exact search, or fuzzy search.
+
+**Permissions**: `MalQuery: Write`
+
+<ParamField path="YaraRule" type="string">
+  Schedule a YARA-based search
+</ParamField>
+
+<ParamField path="Type" type="string">
+  Search pattern type. Valid values: `hex`, `ascii`, `wide`
+</ParamField>
+
+<ParamField path="Value" type="string">
+  Search pattern value
+</ParamField>
+
+<ParamField path="FilterFiletype" type="string[]">
+  File type to include with the result. Valid values:
+  - `cdf`, `cdfv2`, `cjava`, `dalvik`
+  - `doc`, `docx`, `elf32`, `elf64`
+  - `email`, `html`, `hwp`, `java.arc`
+  - `lnk`, `macho`, `pcap`, `pdf`
+  - `pe32`, `pe64`, `perl`, `ppt`, `pptx`
+  - `python`, `pythonc`, `rtf`, `swf`
+  - `text`, `xls`, `xlsx`
+</ParamField>
+
+<ParamField path="FilterMeta" type="string[]">
+  Subset of metadata fields to include in the result. Valid values: `sha256`, `md5`, `type`, `size`, `first_seen`, `label`, `family`
+</ParamField>
+
+<ParamField path="MinSize" type="string">
+  Minimum file size specified in bytes or multiples of KB/MB/GB
+</ParamField>
+
+<ParamField path="MaxSize" type="string">
+  Maximum file size specified in bytes or multiples of KB/MB/GB
+</ParamField>
+
+<ParamField path="MinDate" type="string">
+  Limit results to files first seen after this date (format: YYYY/MM/DD)
+</ParamField>
+
+<ParamField path="MaxDate" type="string">
+  Limit results to files first seen before this date (format: YYYY/MM/DD)
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Fuzzy" type="switch">
+  Search MalQuery quickly but with more potential for false positives
+</ParamField>
+
+```powershell Example
+# Execute a YARA hunt
+$YaraRule = @'
+rule RansomwareDetection {
+    strings:
+        $s1 = "encrypted" nocase
+        $s2 = "payment" nocase
+        $s3 = "bitcoin" nocase
+    condition:
+        2 of them
+}
+'@
+Invoke-FalconMalQuery -YaraRule $YaraRule -FilterMeta sha256,type,family -FilterFiletype pe32,pe64
+
+# Exact search for ASCII string
+Invoke-FalconMalQuery -Type ascii -Value 'MZ' -FilterFiletype pe32,pe64 -Limit 100
+
+# Fuzzy search for hex pattern
+Invoke-FalconMalQuery -Type hex -Value '4D5A' -Fuzzy -FilterMeta sha256,md5,size
+
+# Search with date and size filters
+Invoke-FalconMalQuery -Type ascii -Value 'malicious_string' -MinDate '2024/01/01' -MaxDate '2024/12/31' -MinSize '1KB' -MaxSize '5MB'
+```
+
+---
+
+### Receive-FalconMalQuerySample
+
+Download a sample or sample archive from Falcon MalQuery.
+
+**Permissions**: `MalQuery: Read`
+
+<Note>
+  Downloaded sample archives are password-protected with the password: **infected**
+</Note>
+
+<ParamField path="Path" type="string" required>
+  Destination path
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  SHA256 hash value or MalQuery sample archive identifier
+</ParamField>
+
+<ParamField path="Force" type="switch">
+  Overwrite an existing file when present
+</ParamField>
+
+```powershell Example
+# Download a single sample by SHA256
+Receive-FalconMalQuerySample -Id 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' -Path './sample.bin'
+
+# Download a sample archive
+Receive-FalconMalQuerySample -Id 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' -Path './samples.zip' -Force
+```
+
+---
+
+### Search-FalconMalQueryHash
+
+Perform a simple Falcon MalQuery YARA Hunt for a SHA256 hash.
+
+**Permissions**: `MalQuery: Write`
+
+<Note>
+  This cmdlet performs a YARA Hunt for the given hash, then checks every 5 seconds—for up to 60 seconds—for a result.
+</Note>
+
+<ParamField path="Sha256" type="string" required>
+  SHA256 hash value
+</ParamField>
+
+```powershell Example
+# Quick search for a specific hash
+Search-FalconMalQueryHash -Sha256 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+```
+
+## MalQuery Hunting Workflow
+
+<Steps>
+  <Step title="Check Quota">
+    Use `Get-FalconMalQueryQuota` to verify available search and download quota.
+  </Step>
+  
+  <Step title="Initiate Search">
+    Use `Invoke-FalconMalQuery` to start a YARA hunt, exact search, or fuzzy search. Save the request ID returned.
+  </Step>
+  
+  <Step title="Poll for Results">
+    Use `Get-FalconMalQuery` with the request ID to check search status. Repeat until status is complete.
+  </Step>
+  
+  <Step title="Analyze Metadata">
+    Use `Get-FalconMalQuerySample` with SHA256 hashes from results to retrieve detailed file metadata.
+  </Step>
+  
+  <Step title="Download Samples">
+    Use `Group-FalconMalQuerySample` to schedule samples, then `Receive-FalconMalQuerySample` to download them.
+  </Step>
+</Steps>
+
+## YARA Hunt Examples
+
+<CodeGroup>
+
+```powershell Suspicious PE Characteristics
+# Hunt for PE files with suspicious characteristics
+$YaraRule = @'
+rule SuspiciousPE {
+    meta:
+        description = "Detects PE files with suspicious characteristics"
+    condition:
+        uint16(0) == 0x5A4D and
+        uint32(uint32(0x3C)) == 0x00004550 and
+        filesize < 50KB
+}
+'@
+
+$Hunt = Invoke-FalconMalQuery -YaraRule $YaraRule -FilterFiletype pe32,pe64 -FilterMeta sha256,size,family
+
+# Wait and check results
+Start-Sleep -Seconds 10
+$Results = Get-FalconMalQuery -Id $Hunt.reqid
+```
+
+```powershell Credential Harvesting
+# Hunt for potential credential harvesting malware
+$YaraRule = @'
+rule CredentialHarvester {
+    strings:
+        $s1 = "password" nocase
+        $s2 = "credential" nocase
+        $s3 = "username" nocase
+        $s4 = "login" nocase
+    condition:
+        3 of them
+}
+'@
+
+Invoke-FalconMalQuery -YaraRule $YaraRule -FilterFiletype pe32,pe64 -MinDate '2024/01/01'
+```
+
+```powershell C2 Communication
+# Hunt for files with C2 communication patterns
+$YaraRule = @'
+import "pe"
+
+rule C2Communication {
+    strings:
+        $http = "http://" nocase
+        $post = "POST" nocase
+        $get = "GET" nocase
+        $ua = "User-Agent:" nocase
+    condition:
+        pe.is_pe and
+        all of them
+}
+'@
+
+Invoke-FalconMalQuery -YaraRule $YaraRule -FilterFiletype pe32,pe64 -FilterMeta sha256,family,label
+```
+
+</CodeGroup>
+
+## Exact vs Fuzzy Search
+
+<CardGroup cols={2}>
+  <Card title="Exact Search" icon="magnifying-glass">
+    **Use when**: You need precise matches with no false positives
+    
+    **Characteristics**:
+    - Slower execution
+    - Higher accuracy
+    - Consumes more quota
+    - Best for known indicators
+  </Card>
+  
+  <Card title="Fuzzy Search" icon="magnifying-glass-dollar">
+    **Use when**: You need quick results for broad hunting
+    
+    **Characteristics**:
+    - Faster execution
+    - Potential false positives
+    - Consumes less quota
+    - Best for exploratory hunting
+  </Card>
+</CardGroup>
+
+## Tips and Best Practices
+
+<Warning>
+  MalQuery searches consume quota. Always check your quota with `Get-FalconMalQueryQuota` before starting large hunts.
+</Warning>
+
+<Tip>
+  Use `FilterMeta` to limit returned metadata fields and reduce result size. Only request fields you need for analysis.
+</Tip>
+
+<Tip>
+  For hash-based searches, use `Search-FalconMalQueryHash` which automatically handles polling for results.
+</Tip>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Falcon Intelligence" icon="brain" href="/api/intel">
+    Access threat intelligence indicators
+  </Card>
+  <Card title="Sandbox Analysis" icon="flask" href="/api/falconx">
+    Submit samples for dynamic analysis
+  </Card>
+  <Card title="Sample Uploads" icon="upload" href="/api/sample-uploads">
+    Upload samples to CrowdStrike
+  </Card>
+</CardGroup>

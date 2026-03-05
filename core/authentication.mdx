@@ -1,0 +1,306 @@
+---
+title: Authentication
+description: Learn how to authenticate with CrowdStrike Falcon APIs using PSFalcon's OAuth2 implementation
+icon: key
+---
+
+## Overview
+
+PSFalcon uses OAuth2 authentication to securely connect to CrowdStrike Falcon APIs. Your credentials and access tokens are cached for automatic re-use, and tokens are automatically refreshed when they approach expiration.
+
+## Requesting an Access Token
+
+Use `Request-FalconToken` to authenticate with the Falcon APIs:
+
+<CodeGroup>
+
+```powershell Basic Authentication
+# Authenticate with ClientId and ClientSecret
+Request-FalconToken -ClientId 'abc123...' -ClientSecret 'xyz789...'
+```
+
+```powershell Cloud-Specific
+# Authenticate to a specific cloud region
+Request-FalconToken -ClientId 'abc123...' -ClientSecret 'xyz789...' -Cloud 'us-2'
+```
+
+```powershell Flight Control (Multi-CID)
+# Authenticate to a member CID in Flight Control environments
+Request-FalconToken -ClientId 'abc123...' -ClientSecret 'xyz789...' -MemberCid 'def456...'
+```
+
+```powershell Interactive Prompt
+# Prompt for credentials if not provided
+Request-FalconToken
+```
+
+</CodeGroup>
+
+## Cloud Regions
+
+PSFalcon supports all CrowdStrike cloud regions. Use the `-Cloud` parameter for automatic hostname resolution:
+
+<AccordionGroup>
+  <Accordion title="Available Cloud Regions">
+    | Cloud Value | Hostname | Description |
+    |------------|----------|-------------|
+    | `us-1` | `https://api.crowdstrike.com` | US Commercial 1 (default) |
+    | `us-2` | `https://api.us-2.crowdstrike.com` | US Commercial 2 |
+    | `eu-1` | `https://api.eu-1.crowdstrike.com` | European Union |
+    | `us-gov-1` | `https://api.laggar.gcw.crowdstrike.com` | US GovCloud 1 |
+    | `us-gov-2` | `https://api.us-gov-2.crowdstrike.mil` | US GovCloud 2 |
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  If you don't specify a cloud region, PSFalcon defaults to `us-1`. The module automatically follows redirects if you connect to the wrong region.
+</Note>
+
+## Authentication Parameters
+
+The `Request-FalconToken` function accepts the following parameters from source code `/home/daytona/workspace/source/public/oauth2.ps1:32-74`:
+
+<Steps>
+  <Step title="ClientId (Required)">
+    Your OAuth2 client identifier. Must be a 32-character hexadecimal string matching pattern `^[a-fA-F0-9]{32}$`.
+    
+    If not provided, you'll be prompted to enter it interactively.
+  </Step>
+  
+  <Step title="ClientSecret (Required)">
+    Your OAuth2 client secret. Must be a 40-character alphanumeric string matching pattern `^\w{40}$`.
+    
+    If not provided, you'll be prompted to enter it interactively.
+  </Step>
+  
+  <Step title="Cloud (Optional)">
+    CrowdStrike cloud region: `us-1`, `us-2`, `eu-1`, `us-gov-1`, or `us-gov-2`.
+    
+    Defaults to `us-1` if not specified.
+  </Step>
+  
+  <Step title="MemberCid (Optional)">
+    Member customer identifier for Falcon Flight Control (multi-CID) environments. Must match pattern `^[a-fA-F0-9]{32}(-\w{2})?$`.
+    
+    Used when authenticating as a parent CID to access a specific child CID.
+  </Step>
+</Steps>
+
+## Credential Caching
+
+PSFalcon automatically caches your credentials and token in the `$Script:Falcon` variable:
+
+```powershell
+# After successful authentication, these values are cached:
+# - ClientId
+# - ClientSecret  
+# - MemberCid (if provided)
+# - Hostname
+# - Access token
+# - Token expiration time
+```
+
+<Warning>
+  Cached credentials are stored in memory for the duration of your PowerShell session. They are **not** persisted to disk.
+</Warning>
+
+## Automatic Token Refresh
+
+From `/home/daytona/workspace/source/public/oauth2.ps1:8-10` and `oauth2.ps1:208`:
+
+- Access tokens are valid for a specific duration (typically 30 minutes)
+- PSFalcon automatically checks token expiration before each API request
+- If the token expires in less than **240 seconds** (4 minutes), a new token is automatically requested
+- You don't need to manually refresh tokens
+
+```powershell
+# Token refresh happens automatically during API calls
+Get-FalconHost -Limit 10  # Token checked/refreshed if needed
+```
+
+## Checking Token Status
+
+Use `Test-FalconToken` to check your current authentication status:
+
+```powershell
+Test-FalconToken
+
+# Output:
+# Token     : True
+# Hostname  : https://api.crowdstrike.com
+# ClientId  : abc123def456...
+# MemberCid : 
+```
+
+The `Token` property indicates whether you have a valid, non-expired access token.
+
+## Viewing Your Token
+
+Display the raw OAuth2 access token value:
+
+```powershell
+Show-FalconToken
+# Returns: Bearer token string
+```
+
+<Note>
+  The access token is sensitive. Avoid logging or exposing it in scripts.
+</Note>
+
+## Revoking Tokens
+
+Always revoke your token when you're done to follow security best practices:
+
+```powershell Complete Script Example
+try {
+    # Request token
+    Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+    
+    # Perform API operations
+    Get-FalconHost -Limit 5
+    
+} finally {
+    # Always revoke token
+    if ((Test-FalconToken).Token -eq $true) {
+        Revoke-FalconToken
+    }
+}
+```
+
+`Revoke-FalconToken` clears cached credentials and revokes the active token with the API.
+
+## Flight Control (Multi-CID)
+
+When working with Falcon Flight Control, use the `-MemberCid` parameter to authenticate to specific child CIDs:
+
+<Steps>
+  <Step title="Authenticate to Parent CID">
+    ```powershell
+    Request-FalconToken -ClientId $ParentClientId -ClientSecret $ParentSecret
+    ```
+  </Step>
+  
+  <Step title="Switch to Child CID">
+    ```powershell
+    # Re-authenticate with MemberCid to access child CID
+    Request-FalconToken -ClientId $ParentClientId -ClientSecret $ParentSecret -MemberCid $ChildCid
+    ```
+  </Step>
+  
+  <Step title="Work with Child Resources">
+    ```powershell
+    # All subsequent commands operate in the child CID context
+    Get-FalconHost -Limit 10
+    ```
+  </Step>
+</Steps>
+
+## Advanced: Custom URLs
+
+For troubleshooting or testing, you can specify a custom API URL:
+
+```powershell
+Request-FalconToken -ClientId $Id -ClientSecret $Secret -CustomUrl 'https://custom.api.url'
+```
+
+<Warning>
+  The `-CustomUrl` parameter is for module troubleshooting only. Use `-Cloud` or `-Hostname` for production scenarios.
+</Warning>
+
+## Automatic Region Redirect
+
+From `/home/daytona/workspace/source/public/oauth2.ps1:181-193`:
+
+PSFalcon automatically detects and follows region redirects:
+
+```powershell
+# Connect to wrong region
+Request-FalconToken -ClientId $Id -ClientSecret $Secret -Cloud 'us-1'
+
+# If your tenant is in 'us-2', PSFalcon automatically:
+# 1. Detects the X-Cs-Region header from the response
+# 2. Updates the cached Hostname to the correct region
+# 3. Retries the token request
+```
+
+## Error Handling
+
+Handle authentication errors gracefully:
+
+```powershell
+try {
+    Request-FalconToken -ClientId $ClientId -ClientSecret $ClientSecret
+    
+    if ((Test-FalconToken).Token -ne $true) {
+        throw "Authentication failed"
+    }
+    
+} catch {
+    Write-Error "Failed to authenticate: $_"
+    exit 1
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Store Credentials Securely">
+    Never hardcode credentials in scripts. Use environment variables, secure credential storage, or prompt for input:
+    
+    ```powershell
+    # Use environment variables
+    $ClientId = $env:FALCON_CLIENT_ID
+    $ClientSecret = $env:FALCON_CLIENT_SECRET
+    
+    # Or use Get-Credential for interactive scripts
+    $Cred = Get-Credential -Message "Enter Falcon API credentials"
+    ```
+  </Step>
+  
+  <Step title="Always Revoke Tokens">
+    Use `try/finally` blocks to ensure tokens are revoked:
+    
+    ```powershell
+    try {
+        Request-FalconToken -ClientId $Id -ClientSecret $Secret
+        # Your code here
+    } finally {
+        if ((Test-FalconToken).Token) { Revoke-FalconToken }
+    }
+    ```
+  </Step>
+  
+  <Step title="Verify Authentication">
+    Always check token status after requesting it:
+    
+    ```powershell
+    Request-FalconToken -ClientId $Id -ClientSecret $Secret
+    
+    if ((Test-FalconToken).Token -ne $true) {
+        throw "Authentication failed"
+    }
+    ```
+  </Step>
+  
+  <Step title="Use Appropriate Scopes">
+    Create API clients with the minimum required scopes for your use case in the Falcon console.
+  </Step>
+</Steps>
+
+## Related Commands
+
+- `Request-FalconToken` - Request an OAuth2 access token
+- `Test-FalconToken` - Check token status
+- `Show-FalconToken` - Display token value
+- `Revoke-FalconToken` - Revoke and clear cached credentials
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/core/error-handling">
+    Learn how PSFalcon handles API errors and response validation
+  </Card>
+  <Card title="Pagination" icon="arrows-left-right" href="/core/pagination">
+    Understand automatic pagination for large result sets
+  </Card>
+</CardGroup>

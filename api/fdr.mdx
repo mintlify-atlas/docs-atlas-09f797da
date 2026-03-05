@@ -1,0 +1,399 @@
+---
+title: FDR (Falcon Data Replicator)
+description: Access Falcon Data Replicator schema for event streaming and SIEM integration
+icon: database
+---
+
+The Falcon Data Replicator (FDR) API provides access to event schemas that define the structure of security events streamed from CrowdStrike to external destinations like SIEM platforms, data lakes, and analytics tools.
+
+## Overview
+
+Falcon Data Replicator enables:
+
+- **Event streaming**: Real-time replication of security events to external systems
+- **Schema discovery**: Understand event structures and available fields
+- **SIEM integration**: Configure data ingestion for security analytics platforms
+- **Data lake population**: Stream events to cloud storage for long-term retention
+
+FDR uses a schema-based approach where events are defined by their structure (fields) and categorized by platform and event type.
+
+## Schema Overview
+
+### Get complete schema
+
+```powershell Get-FalconReplicatorSchema
+Get-FalconReplicatorSchema
+```
+
+Returns all FDR schema information including fields and events.
+
+**Example**
+
+```powershell
+# Get entire schema
+$Schema = Get-FalconReplicatorSchema
+
+# View schema structure
+Write-Host "Events: $($Schema.events.Count)"
+Write-Host "Fields: $($Schema.fields.Count)"
+```
+
+## Events
+
+Events represent different types of security telemetry captured by the Falcon sensor.
+
+### Search for events
+
+```powershell Get-FalconReplicatorEvent
+Get-FalconReplicatorEvent [-Filter <string>] [-Sort <string>] [-Limit <int>] [-Offset <int>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Options:
+  - `name.asc`, `name.desc`
+  - `description.asc`, `description.desc`
+  - `platform.asc`, `platform.desc`
+  - `version.asc`, `version.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Example: List all Windows events**
+
+```powershell
+Get-FalconReplicatorEvent -Filter "platform:'Windows'" -Detailed -All
+```
+
+**Example: Search for process-related events**
+
+```powershell
+Get-FalconReplicatorEvent -Filter "name:*'Process'" -Detailed -All
+```
+
+### Get event details by ID
+
+```powershell Get-FalconReplicatorEvent
+Get-FalconReplicatorEvent -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Event identifier(s)
+</ParamField>
+
+**Example**
+
+```powershell
+# Get specific event schema
+$Event = Get-FalconReplicatorEvent -Id "ProcessRollup2"
+
+# View event details
+Write-Host "Event: $($Event.name)"
+Write-Host "Description: $($Event.description)"
+Write-Host "Platform: $($Event.platform)"
+Write-Host "Fields: $($Event.fields.Count)"
+```
+
+## Fields
+
+Fields represent individual data elements within events (e.g., process name, file hash, IP address).
+
+### Search for fields
+
+```powershell Get-FalconReplicatorField
+Get-FalconReplicatorField [-Filter <string>] [-Sort <string>] [-Limit <int>] [-Offset <int>] [-Detailed] [-All] [-Total]
+```
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results. Options:
+  - `name.asc`, `name.desc`
+  - `description.asc`, `description.desc`
+  - `type.asc`, `type.desc`
+  - `universal.asc`, `universal.desc`
+  - `values.asc`, `values.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+<ParamField path="Offset" type="int">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+**Example: Find hash-related fields**
+
+```powershell
+Get-FalconReplicatorField -Filter "name:*'hash'" -Detailed -All
+```
+
+**Example: Search for IP address fields**
+
+```powershell
+Get-FalconReplicatorField -Filter "name:*'ip'" -Detailed -All
+```
+
+### Get field details by ID
+
+```powershell Get-FalconReplicatorField
+Get-FalconReplicatorField -Id <string[]>
+```
+
+<ParamField path="Id" type="string[]" required>
+  Field identifier(s)
+</ParamField>
+
+**Example**
+
+```powershell
+# Get specific field schema
+$Field = Get-FalconReplicatorField -Id "CommandLine"
+
+# View field details
+Write-Host "Field: $($Field.name)"
+Write-Host "Description: $($Field.description)"
+Write-Host "Type: $($Field.type)"
+Write-Host "Universal: $($Field.universal)"
+```
+
+## Common Workflows
+
+### Discover available events by platform
+
+```powershell
+# Get all events grouped by platform
+$AllEvents = Get-FalconReplicatorEvent -Detailed -All
+
+# Group by platform
+$ByPlatform = $AllEvents | Group-Object platform
+
+foreach ($Platform in $ByPlatform) {
+    Write-Host "$($Platform.Name): $($Platform.Count) events"
+    foreach ($Event in $Platform.Group) {
+        Write-Host "  - $($Event.name): $($Event.description)"
+    }
+}
+```
+
+### Map event schemas for SIEM
+
+```powershell
+# Get specific event schema for SIEM mapping
+$EventName = "ProcessRollup2"
+$Event = Get-FalconReplicatorEvent -Filter "name:'$EventName'" -Detailed
+
+Write-Host "Mapping schema for: $($Event.name)"
+Write-Host "Description: $($Event.description)"
+Write-Host "\nFields:"
+
+foreach ($FieldName in $Event.fields) {
+    $Field = Get-FalconReplicatorField -Id $FieldName
+    Write-Host "  $($Field.name) ($($Field.type)): $($Field.description)"
+}
+```
+
+### Find universal fields
+
+```powershell
+# Universal fields appear across multiple event types
+$UniversalFields = Get-FalconReplicatorField -Filter "universal:'true'" -Detailed -All
+
+Write-Host "Universal fields available across events:"
+foreach ($Field in $UniversalFields) {
+    Write-Host "  $($Field.name): $($Field.description)"
+}
+```
+
+### Identify fields by data type
+
+```powershell
+# Get all timestamp fields
+$TimestampFields = Get-FalconReplicatorField -Filter "type:'timestamp'" -Detailed -All
+
+Write-Host "Timestamp fields:"
+$TimestampFields | ForEach-Object { Write-Host "  - $($_.name)" }
+
+# Get all string fields
+$StringFields = Get-FalconReplicatorField -Filter "type:'string'" -Detailed -All
+Write-Host "\nString fields: $($StringFields.Count) total"
+```
+
+### Build event field inventory
+
+```powershell
+# Create comprehensive field inventory
+$AllFields = Get-FalconReplicatorField -Detailed -All
+
+$Inventory = $AllFields | Select-Object name, type, description, universal | Sort-Object name
+
+# Export to CSV for documentation
+$Inventory | Export-Csv -Path ./fdr-field-inventory.csv -NoTypeInformation
+
+Write-Host "Field inventory exported: $($AllFields.Count) fields"
+```
+
+### Analyze schema coverage
+
+```powershell
+# Get complete schema
+$Schema = Get-FalconReplicatorSchema
+
+Write-Host "FDR Schema Summary:"
+Write-Host "  Total Events: $($Schema.events.Count)"
+Write-Host "  Total Fields: $($Schema.fields.Count)"
+
+# Count events by platform
+$Events = Get-FalconReplicatorEvent -Detailed -All
+$PlatformCounts = $Events | Group-Object platform
+
+Write-Host "\nEvents by Platform:"
+foreach ($Platform in $PlatformCounts) {
+    Write-Host "  $($Platform.Name): $($Platform.Count)"
+}
+```
+
+### Prepare SIEM field mapping
+
+```powershell
+# Define events you want to stream
+$TargetEvents = @(
+    "ProcessRollup2",
+    "NetworkConnectIP4",
+    "DnsRequest",
+    "FileWritten"
+)
+
+# Generate field mapping for each event
+foreach ($EventName in $TargetEvents) {
+    Write-Host "\n=== $EventName ==="
+    
+    $Event = Get-FalconReplicatorEvent -Filter "name:'$EventName'" -Detailed
+    
+    Write-Host "Fields to map:"
+    foreach ($FieldName in $Event.fields) {
+        $Field = Get-FalconReplicatorField -Id $FieldName
+        Write-Host "  $($Field.name) | Type: $($Field.type) | $($Field.description)"
+    }
+}
+```
+
+### Validate event availability
+
+```powershell
+# Check if specific events are available in schema
+$RequiredEvents = @("ProcessRollup2", "NetworkConnectIP4", "UserLogon")
+
+foreach ($EventName in $RequiredEvents) {
+    $Event = Get-FalconReplicatorEvent -Filter "name:'$EventName'" -Detailed
+    
+    if ($Event) {
+        Write-Host "✓ $EventName available - $($Event.description)"
+    } else {
+        Write-Host "✗ $EventName not found in schema"
+    }
+}
+```
+
+## Understanding FDR Schema
+
+### Event Structure
+
+Each FDR event has:
+
+- **Name**: Event identifier (e.g., `ProcessRollup2`)
+- **Description**: What the event represents
+- **Platform**: Operating system (Windows, Linux, Mac)
+- **Version**: Schema version
+- **Fields**: Array of field names included in the event
+
+### Field Structure
+
+Each field has:
+
+- **Name**: Field identifier
+- **Description**: What the field contains
+- **Type**: Data type (string, integer, timestamp, etc.)
+- **Universal**: Whether the field appears across multiple event types
+- **Values**: Possible enumerated values (for certain fields)
+
+### Common Event Types
+
+| Event | Description |
+|-------|-------------|
+| ProcessRollup2 | Process execution and lifecycle events |
+| NetworkConnectIP4 | IPv4 network connections |
+| NetworkConnectIP6 | IPv6 network connections |
+| DnsRequest | DNS query events |
+| FileWritten | File write operations |
+| RegistryKeyValue | Windows registry modifications |
+| UserLogon | User authentication events |
+| DetectionSummaryEvent | Security detection summaries |
+
+### Common Field Types
+
+| Type | Description | Example |
+|------|-------------|----------|
+| string | Text data | Process names, file paths |
+| integer | Numeric values | Process IDs, ports |
+| timestamp | Date/time | Event occurrence time |
+| boolean | True/false | Success/failure flags |
+| array | Multiple values | Command line arguments |
+
+## SIEM Integration Tips
+
+<Tip>
+**Field Mapping Strategy**
+
+1. Start with universal fields - they provide consistent context across events
+2. Map timestamp fields for proper event ordering
+3. Include hash fields (SHA256, MD5) for threat intelligence correlation
+4. Map network fields (IPs, domains, ports) for network security analytics
+5. Include user and process context for investigation trails
+</Tip>
+
+<Note>
+Requires **Falcon Data Replicator: Read** permission.
+
+FDR subscription is required to stream events to external destinations. Contact CrowdStrike for licensing.
+</Note>
+
+<Warning>
+Schema versions may change over time. Regularly validate your field mappings against the current schema using these cmdlets.
+</Warning>

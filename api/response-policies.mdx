@@ -1,0 +1,338 @@
+---
+title: Response Policies
+description: Manage Real-time Response policies to control remote access and investigation capabilities
+---
+
+## Overview
+
+Real-time Response (RTR) policies control the level of access administrators have when performing remote operations on endpoints. These policies determine which RTR commands are available for incident response and system management tasks.
+
+<Info>
+**Required API Scope:** `Response policies: Read` (for read operations) or `Response policies: Write` (for write operations)
+</Info>
+
+## Get Response Policies
+
+Search for and retrieve Real-time Response policies.
+
+```powershell Get-FalconResponsePolicy
+Get-FalconResponsePolicy [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Include] <string[]>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]">
+  Policy identifier(s). Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language (FQL) expression to limit results
+  
+  Example: `platform_name:'Windows'+enabled:true`
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+  
+  Valid values: `created_by.asc`, `created_by.desc`, `created_timestamp.asc`, `created_timestamp.desc`, `enabled.asc`, `enabled.desc`, `modified_by.asc`, `modified_by.desc`, `modified_timestamp.asc`, `modified_timestamp.desc`, `name.asc`, `name.desc`, `platform_name.asc`, `platform_name.desc`, `precedence.asc`, `precedence.desc`
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Include" type="string[]">
+  Include additional properties
+  
+  Valid values: `members`
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Get all policies
+Get-FalconResponsePolicy -All -Detailed
+```
+
+```powershell Filter enabled policies
+Get-FalconResponsePolicy -Filter "enabled:true" -Detailed
+```
+
+```powershell Get specific policy with members
+Get-FalconResponsePolicy -Id <policy_id> -Include members
+```
+</CodeGroup>
+
+## Create Response Policy
+
+Create new Real-time Response policies.
+
+```powershell New-FalconResponsePolicy
+New-FalconResponsePolicy -Name <string> -PlatformName <string> [[-Description] <string>] [[-Setting] <object[]>]
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Policy name
+</ParamField>
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Setting" type="object[]">
+  Policy settings controlling RTR capabilities. Each setting should include `id` and `value` properties.
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to create in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Create Windows RTR policy
+$Settings = @(
+    @{ id = 'RESPONSE_GET_COMMAND'; value = 'ENABLED' },
+    @{ id = 'RESPONSE_PUT_COMMAND'; value = 'ENABLED' },
+    @{ id = 'RESPONSE_RUNSCRIPT_COMMAND'; value = 'ENABLED' }
+)
+New-FalconResponsePolicy -Name 'Admin RTR Access' -PlatformName 'Windows' -Description 'Full RTR access for administrators' -Setting $Settings
+```
+
+```powershell Create Linux policy
+New-FalconResponsePolicy -Name 'Linux Standard Access' -PlatformName 'Linux' -Description 'Standard RTR for Linux systems'
+```
+</CodeGroup>
+
+## Edit Response Policy
+
+Modify existing Real-time Response policies.
+
+```powershell Edit-FalconResponsePolicy
+Edit-FalconResponsePolicy -Id <string> [[-Name] <string>] [[-Description] <string>] [[-Setting] <object[]>]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Name" type="string">
+  Policy name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Policy description
+</ParamField>
+
+<ParamField path="Setting" type="object[]">
+  Policy settings to update. Each setting should contain `id` and `value`.
+</ParamField>
+
+<ParamField path="InputObject" type="object[]">
+  One or more policies to modify in a single request (for batch operations, max 100 per request)
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Update policy description
+Edit-FalconResponsePolicy -Id <policy_id> -Description 'Updated RTR policy description'
+```
+
+```powershell Update RTR settings
+$UpdatedSettings = @(
+    @{ id = 'RESPONSE_RUNSCRIPT_COMMAND'; value = 'DISABLED' }
+)
+Edit-FalconResponsePolicy -Id <policy_id> -Setting $UpdatedSettings
+```
+</CodeGroup>
+
+## Remove Response Policy
+
+Remove Real-time Response policies.
+
+```powershell Remove-FalconResponsePolicy
+Remove-FalconResponsePolicy -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifier(s) to remove. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Example
+
+```powershell
+Remove-FalconResponsePolicy -Id <policy_id>
+```
+
+## Policy Actions
+
+Perform actions on Real-time Response policies such as enabling/disabling or assigning to host groups.
+
+```powershell Invoke-FalconResponsePolicyAction
+Invoke-FalconResponsePolicyAction -Name <string> [[-GroupId] <string>] -Id <string>
+```
+
+### Parameters
+
+<ParamField path="Name" type="string" required>
+  Action to perform
+  
+  Valid values: `add-host-group`, `disable`, `enable`, `remove-host-group`
+</ParamField>
+
+<ParamField path="GroupId" type="string">
+  Host group identifier. Pattern: `^[a-fA-F0-9]{32}$`
+  
+  Required for: `add-host-group`, `remove-host-group`
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+### Examples
+
+<CodeGroup>
+```powershell Enable policy
+Invoke-FalconResponsePolicyAction -Name enable -Id <policy_id>
+```
+
+```powershell Assign to host group
+Invoke-FalconResponsePolicyAction -Name add-host-group -GroupId <group_id> -Id <policy_id>
+```
+
+```powershell Disable policy
+Invoke-FalconResponsePolicyAction -Name disable -Id <policy_id>
+```
+</CodeGroup>
+
+## Get Policy Members
+
+Search for members (hosts) assigned to Real-time Response policies.
+
+```powershell Get-FalconResponsePolicyMember
+Get-FalconResponsePolicyMember [[-Id] <string>] [[-Filter] <string>] [[-Sort] <string>] [[-Limit] <int>] [[-Offset] <int>] [-Detailed] [-All] [-Total]
+```
+
+### Parameters
+
+<ParamField path="Id" type="string">
+  Policy identifier. Pattern: `^[a-fA-F0-9]{32}$`
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+<ParamField path="Total" type="switch">
+  Display total result count instead of results
+</ParamField>
+
+### Example
+
+```powershell
+Get-FalconResponsePolicyMember -Id <policy_id> -Detailed -All
+```
+
+## Set Policy Precedence
+
+Set Real-time Response policy precedence order for a specific platform.
+
+```powershell Set-FalconResponsePrecedence
+Set-FalconResponsePrecedence -PlatformName <string> -Id <string[]>
+```
+
+### Parameters
+
+<ParamField path="PlatformName" type="string" required>
+  Operating system platform
+  
+  Valid values: `Windows`, `Mac`, `Linux`
+</ParamField>
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifiers in desired precedence order (highest to lowest priority). Pattern: `^[a-fA-F0-9]{32}$`
+  
+  <Note>All policy identifiers must be supplied in order, with the exception of the `platform_default` policy.</Note>
+</ParamField>
+
+### Example
+
+```powershell
+$PolicyOrder = @('<policy_id_1>', '<policy_id_2>', '<policy_id_3>')
+Set-FalconResponsePrecedence -PlatformName 'Windows' -Id $PolicyOrder
+```
+
+## RTR Policy Settings
+
+Real-time Response policies control which commands are available during RTR sessions. Common settings include:
+
+- **Basic Commands**: Always available (e.g., `ls`, `cd`, `ps`)
+- **Get Commands**: File retrieval from endpoints
+- **Put Commands**: File upload to endpoints
+- **RunScript Commands**: Execute scripts on endpoints
+- **Admin Commands**: Advanced system commands (e.g., registry modifications)
+
+<Warning>
+Grant RTR permissions carefully. Higher privilege levels allow significant system changes and should be restricted to authorized administrators.
+</Warning>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Prevention Policies" icon="shield-halved" href="/api/prevention-policies">
+    Manage Prevention policies
+  </Card>
+  <Card title="Firewall Policies" icon="firewall" href="/api/firewall-policies">
+    Configure firewall rules and policies
+  </Card>
+</CardGroup>

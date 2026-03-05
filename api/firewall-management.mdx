@@ -1,0 +1,513 @@
+---
+title: Firewall Management
+description: Manage Falcon Firewall policies, rules, and network locations
+---
+
+Falcon Firewall Management provides centralized control over host-based firewall policies across Windows and Linux systems. Configure firewall rules, manage rule groups, define network locations, and monitor firewall events.
+
+## Policy Settings
+
+### Get-FalconFirewallSetting
+
+Retrieve general settings for a Falcon Firewall Management policy.
+
+```powershell
+Get-FalconFirewallSetting -Id <policy_id>
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]" required>
+  Policy identifier(s)
+</ParamField>
+
+### Edit-FalconFirewallSetting
+
+Modify Falcon Firewall Management policy settings.
+
+```powershell
+Edit-FalconFirewallSetting -Id <policy_id> -Enforce $true -DefaultInbound DENY -DefaultOutbound ALLOW
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string" required>
+  Policy identifier
+</ParamField>
+
+<ParamField path="PlatformId" type="string">
+  Operating System platform: `0` (Windows), `1` (Linux)
+</ParamField>
+
+<ParamField path="Enforce" type="boolean">
+  Policy enforcement status
+</ParamField>
+
+<ParamField path="RuleGroupId" type="string[]">
+  Rule group identifier(s) in precedence order
+</ParamField>
+
+<ParamField path="DefaultInbound" type="string">
+  Default action for inbound traffic: `ALLOW`, `DENY`
+</ParamField>
+
+<ParamField path="DefaultOutbound" type="string">
+  Default action for outbound traffic: `ALLOW`, `DENY`
+</ParamField>
+
+<ParamField path="MonitorMode" type="boolean">
+  Override all block rules and enable monitoring
+</ParamField>
+
+<ParamField path="LocalLogging" type="boolean">
+  Enable local logging of firewall events
+</ParamField>
+
+<Note>
+All fields are required. PSFalcon automatically adds missing values from your existing policy.
+</Note>
+
+## Rule Groups
+
+### Get-FalconFirewallGroup
+
+Search for Falcon Firewall Management rule groups.
+
+```powershell
+Get-FalconFirewallGroup -Filter "platform_id:'0'" -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  Rule group identifier(s)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search across available fields
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token to retrieve the next set of results
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all available results are retrieved
+</ParamField>
+
+### New-FalconFirewallGroup
+
+Create Falcon Firewall Management rule groups.
+
+```powershell
+New-FalconFirewallGroup -Name "Web Server Rules" -Enabled $true -Platform windows -Description "Allow HTTP/HTTPS"
+```
+
+#### Parameters
+
+<ParamField path="Name" type="string" required>
+  Rule group name
+</ParamField>
+
+<ParamField path="Enabled" type="boolean" required>
+  Rule group enablement status
+</ParamField>
+
+<ParamField path="Platform" type="string" required>
+  Operating system platform: `windows`, `linux`
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Rule group description
+</ParamField>
+
+<ParamField path="Rule" type="object[]">
+  Firewall rules array
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="Library" type="string">
+  Clone default Firewall rules
+</ParamField>
+
+<ParamField path="CloneId" type="string">
+  Clone an existing rule group
+</ParamField>
+
+<ParamField path="Validate" type="switch">
+  Perform validation instead of creating rule group
+</ParamField>
+
+### Edit-FalconFirewallGroup
+
+Modify Falcon Firewall Management rule groups.
+
+```powershell
+# Add a rule to a rule group
+$DiffOps = @(
+    @{
+        op = 'add'
+        path = '/rules/0'
+        value = @{
+            name = 'Allow HTTPS'
+            action = 'ALLOW'
+            direction = 'IN'
+            protocol = '6'
+            local_port = @{ start = '443'; end = '443' }
+        }
+    }
+)
+
+Edit-FalconFirewallGroup -Id <rulegroup_id> -DiffOperation $DiffOps -Comment "Added HTTPS rule"
+```
+
+#### Parameters
+
+<ParamField path="DiffOperation" type="object[]" required>
+  Array of hashtables containing rule or rule group changes with properties: `from`, `op`, `path`, `value`
+  
+  Accepted `op` values: `add`, `remove`, `replace`
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+<ParamField path="RuleId" type="string[]">
+  Firewall rule family values or temp_id for new rules
+</ParamField>
+
+<ParamField path="RuleVersion" type="string[]">
+  Firewall rule version values or 'null' for new rules
+</ParamField>
+
+<ParamField path="Id" type="string" required>
+  Rule group identifier
+</ParamField>
+
+<ParamField path="Validate" type="switch">
+  Perform validation instead of modifying rule group
+</ParamField>
+
+### Remove-FalconFirewallGroup
+
+Remove Falcon Firewall Management rule groups.
+
+```powershell
+Remove-FalconFirewallGroup -Id <rulegroup_id> -Comment "No longer needed"
+```
+
+## Firewall Rules
+
+### Get-FalconFirewallRule
+
+Search for Falcon Firewall Management rules.
+
+```powershell
+# Get rules for a specific policy in precedence order
+Get-FalconFirewallRule -PolicyId <policy_id>
+
+# Search for rules by filter
+Get-FalconFirewallRule -Filter "name:'*Web*'" -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  Rule identifier(s)
+</ParamField>
+
+<ParamField path="PolicyId" type="string">
+  Return rules in precedence order for a specific policy
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all results retrieved
+</ParamField>
+
+## Network Locations
+
+### Get-FalconFirewallLocation
+
+Search for Falcon Firewall Management locations.
+
+```powershell
+Get-FalconFirewallLocation -Filter "enabled:true" -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  Location identifier(s)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Perform a generic substring search
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int">
+  Maximum number of results per request
+</ParamField>
+
+### New-FalconFirewallLocation
+
+Create Falcon Firewall Management locations.
+
+```powershell
+# Create location with network identifiers
+$Location = @{
+    Name = "Office Network"
+    Description = "Corporate office location"
+    Enabled = $true
+    DefaultGateway = @('192.168.1.1')
+    DnsServer = @('192.168.1.10', '192.168.1.11')
+    DhcpServer = @('192.168.1.1')
+}
+
+New-FalconFirewallLocation @Location
+```
+
+#### Parameters
+
+<ParamField path="CloneId" type="string">
+  Clone an existing location
+</ParamField>
+
+<ParamField path="AddFwRule" type="boolean">
+  Include firewall rules from existing location (when using CloneId)
+</ParamField>
+
+<ParamField path="Name" type="string" required>
+  Location name
+</ParamField>
+
+<ParamField path="Description" type="string">
+  Location description
+</ParamField>
+
+<ParamField path="Enabled" type="boolean">
+  Location enablement status
+</ParamField>
+
+<ParamField path="ConnectionType" type="object">
+  Wired or wireless connection types with associated properties
+</ParamField>
+
+<ParamField path="DefaultGateway" type="string[]">
+  Default gateway IP address(es) or CIDR block(s)
+</ParamField>
+
+<ParamField path="DhcpServer" type="string[]">
+  DHCP server IP address(es) or CIDR block(s)
+</ParamField>
+
+<ParamField path="DnsServer" type="string[]">
+  DNS server IP address(es) or CIDR block(s)
+</ParamField>
+
+<ParamField path="HostAddress" type="string[]">
+  Host IP address(es) or CIDR block(s)
+</ParamField>
+
+<ParamField path="DnsResolutionTarget" type="object[]">
+  Target IP/CIDR with optional domain name
+</ParamField>
+
+<ParamField path="HttpsReachableHost" type="object[]">
+  Target domain name using trusted certificate
+</ParamField>
+
+<ParamField path="IcmpRequestTarget" type="object[]">
+  Pingable IP address(es) or CIDR block(s)
+</ParamField>
+
+<ParamField path="Comment" type="string">
+  Audit log comment
+</ParamField>
+
+### Edit-FalconFirewallLocation
+
+Modify Falcon Firewall Management locations.
+
+```powershell
+Edit-FalconFirewallLocation -Id <location_id> -Name "Updated Office Network" -Enabled $true
+```
+
+### Remove-FalconFirewallLocation
+
+Remove Falcon Firewall Management locations.
+
+```powershell
+Remove-FalconFirewallLocation -Id <location_id>
+```
+
+## Firewall Events
+
+### Get-FalconFirewallEvent
+
+Search for Falcon Firewall Management events.
+
+```powershell
+Get-FalconFirewallEvent -Filter "status:'blocked'" -Detailed
+```
+
+#### Parameters
+
+<ParamField path="Id" type="string[]">
+  Event identifier(s)
+</ParamField>
+
+<ParamField path="Filter" type="string">
+  Falcon Query Language expression to limit results
+</ParamField>
+
+<ParamField path="Query" type="string">
+  Generic substring search
+</ParamField>
+
+<ParamField path="Sort" type="string">
+  Property and direction to sort results
+</ParamField>
+
+<ParamField path="Limit" type="int32">
+  Maximum number of results per request (1-5000)
+</ParamField>
+
+<ParamField path="Offset" type="int32">
+  Position to begin retrieving results
+</ParamField>
+
+<ParamField path="After" type="string">
+  Pagination token
+</ParamField>
+
+<ParamField path="Detailed" type="switch">
+  Retrieve detailed information
+</ParamField>
+
+<ParamField path="All" type="switch">
+  Repeat requests until all results retrieved
+</ParamField>
+
+## Use Cases
+
+### Configure Web Server Firewall
+
+```powershell
+# Create rule group for web server
+$Rules = @(
+    @{
+        name = 'Allow HTTP'
+        action = 'ALLOW'
+        direction = 'IN'
+        protocol = '6'
+        local_port = @{ start = '80'; end = '80' }
+    },
+    @{
+        name = 'Allow HTTPS'
+        action = 'ALLOW'
+        direction = 'IN'
+        protocol = '6'
+        local_port = @{ start = '443'; end = '443' }
+    }
+)
+
+$RuleGroup = New-FalconFirewallGroup -Name "Web Server" -Enabled $true `
+    -Platform windows -Rule $Rules -Description "HTTP/HTTPS traffic"
+
+# Apply to policy
+$Policy = Get-FalconFirewallSetting -Id <policy_id>
+Edit-FalconFirewallSetting -Id $Policy.id -RuleGroupId @($RuleGroup.id) -Enforce $true
+```
+
+### Monitor Blocked Traffic
+
+```powershell
+# Get blocked events from last hour
+$OneHourAgo = (Get-Date).AddHours(-1).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+$BlockedEvents = Get-FalconFirewallEvent -Filter "status:'blocked'+created_timestamp:>'$OneHourAgo'" -Detailed
+
+# Analyze blocked connections
+$BlockedEvents | Group-Object -Property local_port | Select-Object Name, Count | Sort-Object Count -Descending
+```
+
+### Manage Network Locations
+
+```powershell
+# Create location for remote office
+$RemoteOffice = New-FalconFirewallLocation -Name "Remote Office" `
+    -DefaultGateway @('10.20.1.1') `
+    -DnsServer @('10.20.1.10') `
+    -Enabled $true
+
+# Set location precedence
+Set-FalconFirewallLocationPrecedence -Id @($Location1.id, $Location2.id, $RemoteOffice.id)
+```
+
+<Note>
+Requires **Firewall management: Read** scope for read operations and **Firewall management: Write** scope for modifications.
+</Note>
+
+## Related Resources
+
+- [Firewall Management Overview](https://falcon.crowdstrike.com/documentation/page/firewall-management)
+- [Network Security Best Practices](https://www.crowdstrike.com/cybersecurity-101/network-security/)

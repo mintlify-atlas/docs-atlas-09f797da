@@ -1,0 +1,464 @@
+---
+title: Threat Intelligence
+description: Access CrowdStrike threat intelligence including indicators, actors, reports, and CVE data
+---
+
+PSFalcon provides access to CrowdStrike Falcon Intelligence for threat research, indicator management, and adversary tracking.
+
+## Custom Indicators (IOCs)
+
+### Understanding Indicator Types
+
+Custom indicators support multiple types:
+
+- **domain**: Domain names
+- **ipv4**, **ipv6**: IP addresses
+- **md5**, **sha256**: File hashes
+- **registry**: Registry keys
+- **username**: User account names
+
+### Create Custom Indicators
+
+```powershell
+# Create a malicious domain indicator
+New-FalconIoc -Type domain `
+  -Value 'malicious.example.com' `
+  -Action detect `
+  -Platform @('windows', 'mac', 'linux') `
+  -Severity high `
+  -Description 'C2 domain from incident IR-2024-001' `
+  -Tag @('C2', 'Incident-2024-001')
+
+# Create a SHA256 hash indicator with prevention
+New-FalconIoc -Type sha256 `
+  -Value 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' `
+  -Action prevent `
+  -Platform @('windows') `
+  -Severity critical `
+  -Filename 'malware.exe' `
+  -Description 'Ransomware payload'
+```
+
+### Indicator Actions
+
+<Steps>
+
+<Step title="no_action">
+Generate a detection but take no preventive action
+</Step>
+
+<Step title="detect">
+Generate a detection event
+</Step>
+
+<Step title="prevent">
+Block execution and generate detection
+</Step>
+
+<Step title="allow">
+Allowlist the indicator (overrides detections)
+</Step>
+
+</Steps>
+
+### Search and Manage Indicators
+
+<CodeGroup>
+
+```powershell Search Indicators
+# List all custom indicators
+Get-FalconIoc -Detailed -All
+
+# Search by type
+Get-FalconIoc -Filter "type:'sha256'" -Detailed
+
+# Find indicators by tag
+Get-FalconIoc -Filter "tags:'C2'" -Detailed -All
+
+# Search by value pattern
+Get-FalconIoc -Filter "value:*'example.com'" -Detailed
+
+# Get specific indicator by ID
+Get-FalconIoc -Id 'abc123def456...' 
+```
+
+```powershell Update Indicators
+# Modify indicator action
+Edit-FalconIoc -Id $IndicatorId -Action prevent
+
+# Update severity
+Edit-FalconIoc -Id $IndicatorId -Severity critical
+
+# Add tags
+Edit-FalconIoc -Id $IndicatorId -Tag @('APT29', 'Russia')
+
+# Set expiration date
+Edit-FalconIoc -Id $IndicatorId -Expiration '2024-12-31T23:59:59Z'
+```
+
+```powershell Delete Indicators
+# Remove specific indicator
+Remove-FalconIoc -Id $IndicatorId
+
+# Bulk delete by filter
+$ExpiredIocs = Get-FalconIoc -Filter "expired:'true'"
+foreach ($Ioc in $ExpiredIocs) {
+    Remove-FalconIoc -Id $Ioc.id
+}
+```
+
+</CodeGroup>
+
+### Host Group Scoping
+
+```powershell
+# Apply indicator to specific host groups
+$Groups = Get-FalconHostGroup -Filter "name:*'Production'*"
+
+New-FalconIoc -Type domain `
+  -Value 'threat.local' `
+  -Action prevent `
+  -HostGroup @($Groups[0].id) `
+  -Description 'Block in production only'
+
+# Apply globally to all hosts
+New-FalconIoc -Type ipv4 `
+  -Value '192.0.2.100' `
+  -Action prevent `
+  -AppliedGlobally $true `
+  -Description 'Global threat IP'
+```
+
+### Retroactive Detections
+
+```powershell
+# Enable retrodetect to generate detections for past activity
+Edit-FalconIoc -Id $IndicatorId -Retrodetect $true
+
+# Create new indicator with retrodetect
+New-FalconIoc -Type sha256 `
+  -Value $FileHash `
+  -Action detect `
+  -Retrodetect $true `
+  -Description 'Check historical executions'
+```
+
+<Warning>
+Retrodetect scans host activity history and may generate **multiple detections** for previously observed indicators. Use this feature carefully in production environments.
+</Warning>
+
+## Threat Intelligence Reports
+
+### Search Intelligence Reports
+
+```powershell
+# Get all available reports
+Get-FalconIntel -Detailed -All
+
+# Search by keyword
+Get-FalconIntel -Query 'ransomware' -Detailed
+
+# Filter by report type
+Get-FalconIntel -Filter "type:'intelligence report'" -Detailed
+
+# Search by target industry
+Get-FalconIntel -Filter "target_industries:'Financial Services'" -Detailed
+
+# Find recent reports
+Get-FalconIntel -Filter "created_date:>='now-30d'" -Sort created_date.desc -Detailed
+```
+
+### Download Intelligence Reports
+
+```powershell
+# Get report details
+$Report = Get-FalconIntel -Filter "name:*'APT29'*" -Detailed | Select-Object -First 1
+
+# Download report PDF
+Receive-FalconIntel -Id $Report.id -Path "./reports/$($Report.slug).pdf"
+
+# Bulk download recent reports
+Get-FalconIntel -Filter "created_date:>='now-7d'" | ForEach-Object {
+    Receive-FalconIntel -Id $_.id -Path "./reports/$($_.slug).pdf"
+}
+```
+
+## Threat Actors
+
+### Search for Actors
+
+```powershell
+# List all tracked actors
+Get-FalconActor -Detailed -All
+
+# Search by name
+Get-FalconActor -Query 'BEAR' -Detailed
+
+# Filter by target country
+Get-FalconActor -Filter "target_countries:'United States'" -Detailed
+
+# Find actors by capability
+Get-FalconActor -Filter "target_industries:'Technology'" -Detailed
+```
+
+### MITRE ATT&CK Mapping
+
+```powershell
+# Get actor with TTPs
+$Actor = Get-FalconActor -Filter "name:'FANCY BEAR'" -Include tactic_and_technique -Detailed
+
+# View techniques used by actor
+$Actor.tactic_and_technique
+
+# Download MITRE ATT&CK data
+Receive-FalconAttck -Slug $Actor.slug -Format json -Path './intel/'
+
+# Get detailed TTP information
+Get-FalconAttck -Slug $Actor.slug | Get-FalconAttck
+```
+
+## Indicators from Intelligence
+
+### Search Intelligence Indicators
+
+```powershell
+# Find recent malicious indicators
+Get-FalconIndicator -Filter "published_date:>='now-7d'" -Detailed -All
+
+# Search by indicator type
+Get-FalconIndicator -Filter "type:'domain'" -Detailed -Limit 100
+
+# Find indicators by malware family
+Get-FalconIndicator -Filter "malware_families:'emotet'" -Detailed
+
+# Include related indicators
+Get-FalconIndicator -Filter "indicator:'192.0.2.*'" -IncludeRelation $true -Detailed
+```
+
+### Import Intelligence Indicators as Custom IOCs
+
+```powershell
+# Get high-confidence recent indicators
+$Indicators = Get-FalconIndicator -Filter "_marker:>='90'+published_date:>='now-1d'" -Detailed -All
+
+# Convert to custom IOCs
+foreach ($Indicator in $Indicators) {
+    try {
+        New-FalconIoc -Type $Indicator.type `
+          -Value $Indicator.indicator `
+          -Action detect `
+          -Source "Falcon Intel: $($Indicator.malware_families -join ', ')" `
+          -Description "Imported from intelligence report" `
+          -Severity high
+        
+        Write-Host "Imported: $($Indicator.indicator)"
+    }
+    catch {
+        Write-Warning "Failed to import $($Indicator.indicator): $_"
+    }
+}
+```
+
+## Malware Families
+
+```powershell
+# List malware families
+Get-FalconMalwareFamily -Detailed -All
+
+# Search by name
+Get-FalconMalwareFamily -Query 'ransomware' -Detailed
+
+# Get MITRE ATT&CK for malware family
+$Family = Get-FalconMalwareFamily -Filter "name:'WannaCry'" -Detailed
+Get-FalconMalwareFamily -Id $Family.id -Mitre
+
+# Download MITRE data
+Receive-FalconMalwareFamilyAttck -Slug $Family.slug -Format JSON -Path './intel/'
+```
+
+## Vulnerabilities (CVEs)
+
+```powershell
+# Search for CVE information
+Get-FalconCve -Query 'Microsoft Exchange' -Detailed -All
+
+# Find recent critical CVEs
+Get-FalconCve -Filter "created_date:>='now-30d'" -Detailed
+
+# Get specific CVE details
+Get-FalconCve -Id 'CVE-2024-1234'
+
+# Search by CVSS score
+Get-FalconCve -Filter "cvss_score:>=9.0" -Detailed
+```
+
+## Detection Rules
+
+### Search Snort/Suricata Rules
+
+```powershell
+# Get latest Snort/Suricata ruleset
+Get-FalconRule -Type snort-suricata-master -Detailed
+
+# Download latest rules
+$LatestRules = Get-FalconRule -Type snort-suricata-master | Select-Object -First 1
+Receive-FalconRule -Id $LatestRules.id -Path './rules/snort-latest.zip'
+
+# Get rule changelog
+Get-FalconRule -Type snort-suricata-changelog -Detailed -All
+```
+
+### YARA Rules
+
+```powershell
+# Get latest YARA rules
+$YaraRules = Get-FalconRule -Type yara-master -Detailed | Select-Object -First 1
+
+# Download YARA ruleset
+Receive-FalconRule -Id $YaraRules.id -Path './rules/yara-master.zip'
+
+# Get incremental updates
+Get-FalconRule -Type yara-update -Detailed -All
+```
+
+## Practical Threat Hunting Workflow
+
+<Steps>
+
+<Step title="Research Threat Actor">
+```powershell
+# Find actor information
+$Actor = Get-FalconActor -Query 'APT28' -Include tactic_and_technique -Detailed
+
+Write-Host "Actor: $($Actor.name)"
+Write-Host "Description: $($Actor.short_description)"
+Write-Host "First Activity: $($Actor.first_activity_date)"
+```
+</Step>
+
+<Step title="Identify TTPs">
+```powershell
+# Review MITRE ATT&CK techniques
+$Actor.tactic_and_technique | ForEach-Object {
+    Write-Host "$($_.tactic) - $($_.technique)"
+}
+```
+</Step>
+
+<Step title="Gather Indicators">
+```powershell
+# Find related indicators
+$Indicators = Get-FalconIndicator -Filter "actors:*'$($Actor.name)'*" -Detailed -All
+
+Write-Host "Found $($Indicators.Count) indicators"
+```
+</Step>
+
+<Step title="Create Custom IOCs">
+```powershell
+# Import high-confidence indicators
+$Indicators | Where-Object { $_._marker -ge 80 } | ForEach-Object {
+    New-FalconIoc -Type $_.type `
+      -Value $_.indicator `
+      -Action detect `
+      -Tag @($Actor.name, 'ThreatHunt-2024') `
+      -Description "$($Actor.name) indicator" `
+      -Source "Falcon Intelligence"
+}
+```
+</Step>
+
+<Step title="Download Intelligence Reports">
+```powershell
+# Get related reports
+$Reports = Get-FalconIntel -Query $Actor.name -Detailed
+
+foreach ($Report in $Reports) {
+    Receive-FalconIntel -Id $Report.id -Path "./hunt/$($Report.slug).pdf"
+}
+```
+</Step>
+
+<Step title="Hunt for Activity">
+```powershell
+# Search for detections matching IOCs
+$Detections = Get-FalconDetection -Filter "tags:*'ThreatHunt-2024'*" -Detailed -All
+
+if ($Detections) {
+    Write-Host "ALERT: Found $($Detections.Count) detections matching hunt criteria"
+    $Detections | Select-Object hostname, detection_id, severity
+}
+```
+</Step>
+
+</Steps>
+
+## Automated Intelligence Import
+
+```powershell
+# Daily import of new high-confidence indicators
+function Import-DailyIntelligence {
+    # Get yesterday's high-confidence indicators
+    $Indicators = Get-FalconIndicator -Filter "published_date:>='now-1d'+_marker:>=85" -Detailed -All
+    
+    $ImportCount = 0
+    $SkipCount = 0
+    
+    foreach ($Indicator in $Indicators) {
+        # Check if already imported
+        $Existing = Get-FalconIoc -Filter "value:'$($Indicator.indicator)'" -Detailed
+        
+        if (-not $Existing) {
+            try {
+                New-FalconIoc -Type $Indicator.type `
+                  -Value $Indicator.indicator `
+                  -Action detect `
+                  -Platform @('windows', 'mac', 'linux') `
+                  -Severity medium `
+                  -Source 'Auto-Import' `
+                  -Description "Intel: $($Indicator.malware_families -join ', ')" `
+                  -Tag @('AutoImport', (Get-Date -Format 'yyyy-MM-dd'))
+                
+                $ImportCount++
+            }
+            catch {
+                Write-Warning "Failed: $($Indicator.indicator) - $_"
+            }
+        }
+        else {
+            $SkipCount++
+        }
+    }
+    
+    Write-Host "Imported: $ImportCount | Skipped (existing): $SkipCount"
+}
+
+# Run the import
+Import-DailyIntelligence
+```
+
+## Indicator Management Best Practices
+
+<Note>
+- **Tag indicators** by campaign, threat actor, or incident for tracking
+- Use **expiration dates** to automatically disable time-limited indicators
+- Set **appropriate actions** (detect vs prevent) based on confidence level
+- Apply **retrodetect** selectively to avoid alert fatigue
+- **Document sources** in the description field
+- Use **host group scoping** for testing before global deployment
+</Note>
+
+<Warning>
+**False Positive Risk**: Always validate intelligence indicators before setting action to `prevent`. Start with `detect` to assess impact.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Policies" icon="shield" href="./managing-policies">
+    Configure prevention policies based on threat intelligence
+  </Card>
+  <Card title="Cloud Security" icon="cloud" href="./cloud-security">
+    Extend threat intelligence to cloud environments
+  </Card>
+</CardGroup>
