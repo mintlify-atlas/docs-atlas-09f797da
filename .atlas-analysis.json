@@ -1,0 +1,211 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "PSFalcon",
+  "projectDescription": "PowerShell module for CrowdStrike Falcon OAuth2 APIs",
+  "theme": "aspen",
+  "primaryColor": "#242b2c",
+  "lightColor": "#040404",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/authentication",
+              "core/error-handling",
+              "core/pagination",
+              "core/filtering"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/working-with-hosts",
+              "guides/real-time-response",
+              "guides/managing-policies",
+              "guides/threat-intelligence",
+              "guides/cloud-security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/oauth2"
+            ]
+          },
+          {
+            "group": "Alerts & Detections",
+            "pages": [
+              "api/alerts",
+              "api/detects",
+              "api/incidents",
+              "api/overwatch"
+            ]
+          },
+          {
+            "group": "Host Management",
+            "pages": [
+              "api/devices",
+              "api/host-groups",
+              "api/sensor-tags"
+            ]
+          },
+          {
+            "group": "Real-time Response",
+            "pages": [
+              "api/real-time-response",
+              "api/rtr-admin",
+              "api/rtr-scripts"
+            ]
+          },
+          {
+            "group": "Threat Intelligence",
+            "pages": [
+              "api/intel",
+              "api/iocs",
+              "api/malquery",
+              "api/falconx"
+            ]
+          },
+          {
+            "group": "Policy Management",
+            "pages": [
+              "api/prevention-policies",
+              "api/response-policies",
+              "api/sensor-update-policies",
+              "api/firewall-policies",
+              "api/device-control-policies"
+            ]
+          },
+          {
+            "group": "Cloud Security",
+            "pages": [
+              "api/cloud-aws",
+              "api/cloud-azure",
+              "api/cloud-gcp",
+              "api/container-security",
+              "api/kubernetes-protection"
+            ]
+          },
+          {
+            "group": "Identity & Access",
+            "pages": [
+              "api/user-management",
+              "api/mssp",
+              "api/identity-protection"
+            ]
+          },
+          {
+            "group": "Security Operations",
+            "pages": [
+              "api/spotlight",
+              "api/filevantage",
+              "api/firewall-management",
+              "api/quarantine",
+              "api/workflows"
+            ]
+          },
+          {
+            "group": "Monitoring & Analysis",
+            "pages": [
+              "api/recon",
+              "api/threat-graph",
+              "api/discover",
+              "api/fdr",
+              "api/logscale"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/samples",
+              "api/reports",
+              "api/config"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Common Tasks",
+            "pages": [
+              "examples/authentication",
+              "examples/host-operations",
+              "examples/detection-management",
+              "examples/rtr-automation"
+            ]
+          },
+          {
+            "group": "Advanced Scenarios",
+            "pages": [
+              "examples/bulk-operations",
+              "examples/custom-ioc-workflows",
+              "examples/mssp-operations",
+              "examples/reporting-automation"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "OAuth2 authentication with automatic token refresh",
+    "400+ cmdlets covering all CrowdStrike Falcon APIs",
+    "Real-time Response automation and batch operations",
+    "Comprehensive policy and host group management",
+    "Threat intelligence and IOC workflows",
+    "Cloud security posture management (AWS, Azure, GCP)",
+    "Container and Kubernetes security",
+    "MSSP and multi-CID environment support",
+    "Built-in filtering, pagination, and error handling",
+    "Cross-platform support (Windows, Linux, macOS)"
+  ],
+  "publicApiSurface": [
+    "Request-FalconToken",
+    "Get-FalconHost",
+    "Invoke-FalconHostAction",
+    "Get-FalconAlert",
+    "Get-FalconIncident",
+    "Start-FalconSession",
+    "Invoke-FalconAdminCommand",
+    "Get-FalconPreventionPolicy",
+    "Get-FalconResponsePolicy",
+    "Get-FalconSensorUpdatePolicy",
+    "Get-FalconIoc",
+    "New-FalconIoc",
+    "Get-FalconIntel",
+    "Get-FalconReport",
+    "New-FalconSubmission",
+    "Get-FalconCloudAwsAccount",
+    "Get-FalconContainerImage",
+    "Get-FalconUser",
+    "Get-FalconVulnerability",
+    "Get-FalconFileVantageChange",
+    "Export-FalconConfig",
+    "Import-FalconConfig"
+  ]
+}
